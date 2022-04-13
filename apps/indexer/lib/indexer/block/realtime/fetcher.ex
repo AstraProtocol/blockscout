@@ -14,7 +14,6 @@ defmodule Indexer.Block.Realtime.Fetcher do
   import Indexer.Block.Fetcher,
     only: [
       async_import_block_rewards: 1,
-      async_import_cosmos_hashes: 1,
       async_import_created_contract_codes: 1,
       async_import_internal_transactions: 1,
       async_import_replaced_transactions: 1,
@@ -26,21 +25,19 @@ defmodule Indexer.Block.Realtime.Fetcher do
     ]
 
   alias Ecto.Changeset
-  alias EthereumJSONRPC.{FetchedBalances, Subscription}
+  alias EthereumJSONRPC.{Blocks, FetchedBalances, Subscription}
   alias Explorer.Chain
   alias Explorer.Chain.Cache.Accounts
   alias Explorer.Chain.Events.Publisher
   alias Explorer.Counters.AverageBlockTime
   alias Indexer.{Block, Tracer}
   alias Indexer.Block.Realtime.TaskSupervisor
-  alias Indexer.Fetcher.CoinBalance
-  alias Indexer.Prometheus
   alias Indexer.Transform.Addresses
   alias Timex.Duration
 
   @behaviour Block.Fetcher
 
-  @minimum_safe_polling_period :timer.seconds(2)
+  @minimum_safe_polling_period :timer.seconds(1)
 
   @enforce_keys ~w(block_fetcher)a
   defstruct ~w(block_fetcher subscription previous_number max_number_seen timer)a
@@ -292,16 +289,8 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
   @decorate span(tracer: Tracer)
   defp do_fetch_and_import_block(block_number_to_fetch, block_fetcher, retry) do
-    time_before = Timex.now()
-
-    {fetch_duration, result} =
-      :timer.tc(fn -> fetch_and_import_range(block_fetcher, block_number_to_fetch..block_number_to_fetch) end)
-
-    Prometheus.Instrumenter.block_full_process(fetch_duration, __MODULE__)
-
-    case result do
-      {:ok, %{inserted: inserted, errors: []}} ->
-        log_import_timings(inserted, fetch_duration, time_before)
+    case fetch_and_import_range(block_fetcher, block_number_to_fetch..block_number_to_fetch) do
+      {:ok, %{inserted: _, errors: []}} ->
         Logger.debug("Fetched and imported.")
 
       {:ok, %{inserted: _, errors: [_ | _] = errors}} ->
@@ -314,8 +303,6 @@ defmodule Indexer.Block.Realtime.Fetcher do
         end)
 
       {:error, {:import = step, [%Changeset{} | _] = changesets}} ->
-        Prometheus.Instrumenter.import_errors()
-
         params = %{
           changesets: changesets,
           block_number_to_fetch: block_number_to_fetch,
@@ -339,7 +326,6 @@ defmodule Indexer.Block.Realtime.Fetcher do
         end
 
       {:error, {:import = step, reason}} ->
-        Prometheus.Instrumenter.import_errors()
         Logger.error(fn -> inspect(reason) end, step: step)
 
       {:error, {step, reason}} ->
@@ -368,22 +354,11 @@ defmodule Indexer.Block.Realtime.Fetcher do
     end
   end
 
-  defp log_import_timings(%{blocks: [%{number: number, timestamp: timestamp}]}, fetch_duration, time_before) do
-    node_delay = Timex.diff(time_before, timestamp, :seconds)
-    Prometheus.Instrumenter.node_delay(node_delay)
-
-    Logger.debug("Block #{number} fetching duration: #{fetch_duration / 1_000_000}s. Node delay: #{node_delay}s.",
-      fetcher: :block_import_timings
-    )
-  end
-
-  defp log_import_timings(_inserted, _duration, _time_before), do: nil
-
   defp retry_fetch_and_import_block(%{retry: retry}) when retry < 1, do: :ignore
 
   defp retry_fetch_and_import_block(%{changesets: changesets} = params) do
     if unknown_block_number_error?(changesets) do
-      # Wait half a second to give Nethermind time to sync.
+      # Wait half a second to give Parity time to sync.
       :timer.sleep(500)
 
       number = params.block_number_to_fetch
@@ -412,7 +387,6 @@ defmodule Indexer.Block.Realtime.Fetcher do
     async_import_token_instances(imported)
     async_import_uncles(imported)
     async_import_replaced_transactions(imported)
-    async_import_cosmos_hashes(imported)
   end
 
   defp balances(
@@ -433,7 +407,20 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
         importable_balances_params = Enum.map(params_list, &Map.put(&1, :value_fetched_at, value_fetched_at))
 
-        block_timestamp_map = CoinBalance.block_timestamp_map(params_list, json_rpc_named_arguments)
+        block_numbers =
+          params_list
+          |> Enum.map(&Map.get(&1, :block_number))
+          |> Enum.sort()
+          |> Enum.dedup()
+
+        block_timestamp_map =
+          Enum.reduce(block_numbers, %{}, fn block_number, map ->
+            {:ok, %Blocks{blocks_params: [%{timestamp: timestamp}]}} =
+              EthereumJSONRPC.fetch_blocks_by_range(block_number..block_number, json_rpc_named_arguments)
+
+            day = DateTime.to_date(timestamp)
+            Map.put(map, "#{block_number}", day)
+          end)
 
         importable_balances_daily_params =
           Enum.map(params_list, fn param ->
