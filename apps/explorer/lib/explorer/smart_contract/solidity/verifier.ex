@@ -10,10 +10,7 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
 
   alias ABI.{FunctionSelector, TypeDecoder}
   alias Explorer.Chain
-  alias Explorer.SmartContract.RustVerifierInterface
   alias Explorer.SmartContract.Solidity.CodeCompiler
-
-  require Logger
 
   @bytecode_hash_options ["default", "none", "bzzr1"]
 
@@ -23,41 +20,6 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
     do: {:error, :contract_source_code}
 
   def evaluate_authenticity(address_hash, params) do
-    try do
-      evaluate_authenticity_inner(RustVerifierInterface.enabled?(), address_hash, params)
-    rescue
-      exception ->
-        Logger.error(fn ->
-          [
-            "Error while verifying smart-contract address: #{address_hash}, params: #{inspect(params, limit: :infinity, printable_limit: :infinity)}: ",
-            Exception.format(:error, exception)
-          ]
-        end)
-    end
-  end
-
-  defp evaluate_authenticity_inner(true, address_hash, params) do
-    deployed_bytecode = Chain.smart_contract_bytecode(address_hash)
-
-    creation_tx_input =
-      case Chain.smart_contract_creation_tx_bytecode(address_hash) do
-        %{init: init, created_contract_code: _created_contract_code} ->
-          init
-
-        _ ->
-          ""
-      end
-
-    params
-    |> Map.put("creation_bytecode", creation_tx_input)
-    |> Map.put("deployed_bytecode", deployed_bytecode)
-    |> Map.put("sources", %{"#{params["name"]}.sol" => params["contract_source_code"]})
-    |> Map.put("contract_libraries", params["external_libraries"])
-    |> Map.put("optimization_runs", prepare_optimization_runs(params["optimization"], params["optimization_runs"]))
-    |> RustVerifierInterface.verify_multi_part()
-  end
-
-  defp evaluate_authenticity_inner(false, address_hash, params) do
     latest_evm_version = List.last(CodeCompiler.allowed_evm_versions())
     evm_version = Map.get(params, "evm_version", latest_evm_version)
 
@@ -81,79 +43,8 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
     end)
   end
 
-  defp prepare_optimization_runs(false_, _) when false_ in [false, "false"], do: nil
-
-  defp prepare_optimization_runs(true_, runs) when true_ in [true, "true"] do
-    case Integer.parse(runs) do
-      {runs_integer, ""} ->
-        runs_integer
-
-      _ ->
-        nil
-    end
-  end
-
   def evaluate_authenticity_via_standard_json_input(address_hash, params, json_input) do
-    try do
-      evaluate_authenticity_via_standard_json_input_inner(
-        RustVerifierInterface.enabled?(),
-        address_hash,
-        params,
-        json_input
-      )
-    rescue
-      exception ->
-        Logger.error(fn ->
-          [
-            "Error while verifying smart-contract address: #{address_hash}, params: #{inspect(params, limit: :infinity, printable_limit: :infinity)}, json_input: #{inspect(json_input, limit: :infinity, printable_limit: :infinity)}: ",
-            Exception.format(:error, exception)
-          ]
-        end)
-    end
-  end
-
-  def evaluate_authenticity_via_standard_json_input_inner(true, address_hash, params, json_input) do
-    deployed_bytecode = Chain.smart_contract_bytecode(address_hash)
-
-    creation_tx_input =
-      case Chain.smart_contract_creation_tx_bytecode(address_hash) do
-        %{init: init, created_contract_code: _created_contract_code} ->
-          init
-
-        _ ->
-          ""
-      end
-
-    params
-    |> Map.put("creation_bytecode", creation_tx_input)
-    |> Map.put("deployed_bytecode", deployed_bytecode)
-    |> Map.put("input", json_input)
-    |> RustVerifierInterface.verify_standard_json_input()
-  end
-
-  def evaluate_authenticity_via_standard_json_input_inner(false, address_hash, params, json_input) do
     verify(address_hash, params, json_input)
-  end
-
-  def evaluate_authenticity_via_multi_part_files(address_hash, params, files) do
-    deployed_bytecode = Chain.smart_contract_bytecode(address_hash)
-
-    creation_tx_input =
-      case Chain.smart_contract_creation_tx_bytecode(address_hash) do
-        %{init: init, created_contract_code: _created_contract_code} ->
-          init
-
-        _ ->
-          ""
-      end
-
-    params
-    |> Map.put("creation_bytecode", creation_tx_input)
-    |> Map.put("deployed_bytecode", deployed_bytecode)
-    |> Map.put("sources", files)
-    |> Map.put("contract_libraries", params["external_libraries"])
-    |> Map.put("optimization_runs", prepare_optimization_runs(params["optimization"], params["optimization_runs"]))
-    |> RustVerifierInterface.verify_multi_part()
   end
 
   defp verify(address_hash, params, json_input) do
@@ -286,8 +177,6 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
       )
     end
   end
-
-  defp is_compiler_version_at_least_0_6_0?("latest"), do: true
 
   defp is_compiler_version_at_least_0_6_0?(compiler_version) do
     [version, _] = compiler_version |> String.split("+", parts: 2)
@@ -525,11 +414,9 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
     Enum.any?(abi, fn el -> el["type"] == "constructor" && el["inputs"] != [] end)
   end
 
-  def parse_boolean("true"), do: true
-  def parse_boolean("false"), do: false
+  defp parse_boolean("true"), do: true
+  defp parse_boolean("false"), do: false
 
-  def parse_boolean(true), do: true
-  def parse_boolean(false), do: false
-
-  def parse_boolean(_), do: false
+  defp parse_boolean(true), do: true
+  defp parse_boolean(false), do: false
 end

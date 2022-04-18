@@ -13,9 +13,9 @@ defmodule Explorer.Chain.SmartContract do
   use Explorer.Schema
 
   alias Ecto.Changeset
-  alias Explorer.{Chain, Repo}
   alias Explorer.Chain.{Address, ContractMethod, DecompiledSmartContract, Hash}
   alias Explorer.Chain.SmartContract.ExternalLibrary
+  alias Explorer.Repo
 
   @typedoc """
   The name of a parameter to a function or event.
@@ -410,11 +410,7 @@ defmodule Explorer.Chain.SmartContract do
 
   defp error_message(:unknown_error), do: "Unable to verify: unknown error."
   defp error_message(:deployed_bytecode), do: "Deployed bytecode does not correspond to contract creation code."
-
-  defp error_message(string) when is_binary(string), do: string
-
   defp error_message(_), do: "There was an error validating your contract, please try again."
-
   defp error_message(:compilation, error_message), do: "There was an error compiling your contract: #{error_message}"
 
   defp select_error_field(:no_creation_data), do: :address_hash
@@ -427,11 +423,8 @@ defmodule Explorer.Chain.SmartContract do
   defp select_error_field(:name), do: :name
   defp select_error_field(_), do: :contract_source_code
 
-  def merge_twin_contract_with_changeset(%__MODULE__{} = twin_contract, %Changeset{} = changeset) do
-    %__MODULE__{}
-    |> changeset(Map.from_struct(twin_contract))
-    |> Changeset.put_change(:autodetect_constructor_args, true)
-    |> Changeset.force_change(:address_hash, Changeset.get_field(changeset, :address_hash))
+  def merge_twin_contract_with_changeset(%__MODULE__{} = twin_contract, %Changeset{} = _changeset) do
+    changeset(twin_contract, %{})
   end
 
   def merge_twin_contract_with_changeset(nil, %Changeset{} = changeset) do
@@ -447,18 +440,12 @@ defmodule Explorer.Chain.SmartContract do
 
   def merge_twin_vyper_contract_with_changeset(
         %__MODULE__{is_vyper_contract: true} = twin_contract,
-        %Changeset{} = changeset
+        %Changeset{} = _changeset
       ) do
-    %__MODULE__{}
-    |> changeset(Map.from_struct(twin_contract))
-    |> Changeset.force_change(:address_hash, Changeset.get_field(changeset, :address_hash))
+    changeset(twin_contract, %{})
   end
 
   def merge_twin_vyper_contract_with_changeset(%__MODULE__{is_vyper_contract: false}, %Changeset{} = changeset) do
-    merge_twin_vyper_contract_with_changeset(nil, changeset)
-  end
-
-  def merge_twin_vyper_contract_with_changeset(%__MODULE__{is_vyper_contract: nil}, %Changeset{} = changeset) do
     merge_twin_vyper_contract_with_changeset(nil, changeset)
   end
 
@@ -468,21 +455,4 @@ defmodule Explorer.Chain.SmartContract do
     |> Changeset.put_change(:compiler_version, "latest")
     |> Changeset.put_change(:contract_source_code, "")
   end
-
-  def address_to_checksum_address(changeset) do
-    checksum_address =
-      changeset
-      |> Changeset.get_field(:address_hash)
-      |> to_address_hash()
-      |> Address.checksum()
-
-    Changeset.force_change(changeset, :address_hash, checksum_address)
-  end
-
-  defp to_address_hash(string) when is_binary(string) do
-    {:ok, address_hash} = Chain.string_to_address_hash(string)
-    address_hash
-  end
-
-  defp to_address_hash(address_hash), do: address_hash
 end
