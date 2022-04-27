@@ -2,12 +2,16 @@ import Config
 
 config :ethereum_jsonrpc, EthereumJSONRPC.RequestCoordinator,
   rolling_window_opts: [
-    window_count: 6,
+    window_count: 12,
     duration: :timer.minutes(1),
     table: EthereumJSONRPC.RequestCoordinator.TimeoutCounter
   ],
-  wait_per_timeout: :timer.seconds(3),
-  max_jitter: :timer.seconds(1)
+  wait_per_timeout: :timer.seconds(20),
+  max_jitter: :timer.seconds(2)
+
+config :ethereum_jsonrpc,
+  rpc_transport: if(System.get_env("ETHEREUM_JSONRPC_TRANSPORT", "http") == "http", do: :http, else: :ipc),
+  ipc_path: System.get_env("IPC_PATH")
 
 # Add this configuration to add global RPC request throttling.
 # throttle_rate_limit: 250,
@@ -24,21 +28,6 @@ config :ethereum_jsonrpc, EthereumJSONRPC.Tracer,
 
 debug_trace_transaction_timeout = System.get_env("ETHEREUM_JSONRPC_DEBUG_TRACE_TRANSACTION_TIMEOUT", "5s")
 config :ethereum_jsonrpc, EthereumJSONRPC.Geth, debug_trace_transaction_timeout: debug_trace_transaction_timeout
-
-config :ethereum_jsonrpc, EthereumJSONRPC.RequestCoordinator,
-       rolling_window_opts: [
-         window_count: 6,
-         duration: :timer.minutes(1),
-         table: EthereumJSONRPC.RequestCoordinator.TimeoutCounter
-       ],
-       wait_per_timeout: :timer.seconds(3),
-       max_jitter: :timer.seconds(1),
-       throttle_rate_limit: 120,
-       throttle_rolling_window_opts: [
-         window_count: 3,
-         duration: :timer.seconds(3),
-         table: EthereumJSONRPC.RequestCoordinator.RequestCounter
-       ]
 
 config :logger, :ethereum_jsonrpc,
   # keep synced with `config/config.exs`
