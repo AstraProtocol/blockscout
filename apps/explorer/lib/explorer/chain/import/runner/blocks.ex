@@ -13,7 +13,6 @@ defmodule Explorer.Chain.Import.Runner.Blocks do
   alias Explorer.Chain.Import.Runner
   alias Explorer.Chain.Import.Runner.Address.CurrentTokenBalances
   alias Explorer.Chain.Import.Runner.Tokens
-  alias Explorer.Prometheus.Instrumenter
   alias Explorer.Repo, as: ExplorerRepo
 
   @behaviour Runner
@@ -62,7 +61,8 @@ defmodule Explorer.Chain.Import.Runner.Blocks do
     consensus_block_numbers = consensus_block_numbers(changes_list)
 
     # Enforce ShareLocks tables order (see docs: sharelocks.md)
-    run_func = fn repo ->
+    multi
+    |> Multi.run(:lose_consensus, fn repo, _ ->
       {:ok, nonconsensus_items} = lose_consensus(repo, hashes, consensus_block_numbers, changes_list, insert_options)
 
       nonconsensus_hashes =
@@ -75,141 +75,64 @@ defmodule Explorer.Chain.Import.Runner.Blocks do
         end
 
       {:ok, nonconsensus_hashes}
-    end
-
-    multi
-    |> Multi.run(:lose_consensus, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn -> run_func.(repo) end,
-        :address_referencing,
-        :blocks,
-        :lose_consensus
-      )
     end)
     |> Multi.run(:blocks, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn ->
-          # Note, needs to be executed after `lose_consensus` for lock acquisition
-          insert(repo, changes_list, insert_options)
-        end,
-        :address_referencing,
-        :blocks,
-        :blocks
-      )
+      # Note, needs to be executed after `lose_consensus` for lock acquisition
+      insert(repo, changes_list, insert_options)
     end)
     |> Multi.run(:new_pending_operations, fn repo, %{lose_consensus: nonconsensus_hashes} ->
-      Instrumenter.block_import_stage_runner(
-        fn ->
-          new_pending_operations(repo, nonconsensus_hashes, hashes_for_pending_block_operations, insert_options)
-        end,
-        :address_referencing,
-        :blocks,
-        :new_pending_operations
-      )
+      new_pending_operations(repo, nonconsensus_hashes, hashes_for_pending_block_operations, insert_options)
     end)
     |> Multi.run(:uncle_fetched_block_second_degree_relations, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn ->
-          update_block_second_degree_relations(repo, hashes, %{
-            timeout:
-              options[Runner.Block.SecondDegreeRelations.option_key()][:timeout] ||
-                Runner.Block.SecondDegreeRelations.timeout(),
-            timestamps: timestamps
-          })
-        end,
-        :address_referencing,
-        :blocks,
-        :uncle_fetched_block_second_degree_relations
-      )
+      update_block_second_degree_relations(repo, hashes, %{
+        timeout:
+          options[Runner.Block.SecondDegreeRelations.option_key()][:timeout] ||
+            Runner.Block.SecondDegreeRelations.timeout(),
+        timestamps: timestamps
+      })
     end)
     |> Multi.run(:delete_rewards, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn -> delete_rewards(repo, changes_list, insert_options) end,
-        :address_referencing,
-        :blocks,
-        :delete_rewards
-      )
+      delete_rewards(repo, changes_list, insert_options)
     end)
     |> Multi.run(:fork_transactions, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn ->
-          fork_transactions(%{
-            repo: repo,
-            timeout: options[Runner.Transactions.option_key()][:timeout] || Runner.Transactions.timeout(),
-            timestamps: timestamps,
-            blocks_changes: changes_list
-          })
-        end,
-        :address_referencing,
-        :blocks,
-        :fork_transactions
-      )
+      fork_transactions(%{
+        repo: repo,
+        timeout: options[Runner.Transactions.option_key()][:timeout] || Runner.Transactions.timeout(),
+        timestamps: timestamps,
+        blocks_changes: changes_list
+      })
     end)
     |> Multi.run(:derive_transaction_forks, fn repo, %{fork_transactions: transactions} ->
-      Instrumenter.block_import_stage_runner(
-        fn ->
-          derive_transaction_forks(%{
-            repo: repo,
-            timeout: options[Runner.Transaction.Forks.option_key()][:timeout] || Runner.Transaction.Forks.timeout(),
-            timestamps: timestamps,
-            transactions: transactions
-          })
-        end,
-        :address_referencing,
-        :blocks,
-        :derive_transaction_forks
-      )
+      derive_transaction_forks(%{
+        repo: repo,
+        timeout: options[Runner.Transaction.Forks.option_key()][:timeout] || Runner.Transaction.Forks.timeout(),
+        timestamps: timestamps,
+        transactions: transactions
+      })
     end)
     |> Multi.run(:acquire_contract_address_tokens, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn -> acquire_contract_address_tokens(repo, consensus_block_numbers) end,
-        :address_referencing,
-        :blocks,
-        :acquire_contract_address_tokens
-      )
+      acquire_contract_address_tokens(repo, consensus_block_numbers)
     end)
     |> Multi.run(:delete_address_token_balances, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn -> delete_address_token_balances(repo, consensus_block_numbers, insert_options) end,
-        :address_referencing,
-        :blocks,
-        :delete_address_token_balances
-      )
+      delete_address_token_balances(repo, consensus_block_numbers, insert_options)
     end)
     |> Multi.run(:delete_address_current_token_balances, fn repo, _ ->
-      Instrumenter.block_import_stage_runner(
-        fn -> delete_address_current_token_balances(repo, consensus_block_numbers, insert_options) end,
-        :address_referencing,
-        :blocks,
-        :delete_address_current_token_balances
-      )
+      delete_address_current_token_balances(repo, consensus_block_numbers, insert_options)
     end)
     |> Multi.run(:derive_address_current_token_balances, fn repo,
                                                             %{
                                                               delete_address_current_token_balances:
                                                                 deleted_address_current_token_balances
                                                             } ->
-      Instrumenter.block_import_stage_runner(
-        fn -> derive_address_current_token_balances(repo, deleted_address_current_token_balances, insert_options) end,
-        :address_referencing,
-        :blocks,
-        :derive_address_current_token_balances
-      )
+      derive_address_current_token_balances(repo, deleted_address_current_token_balances, insert_options)
     end)
     |> Multi.run(:blocks_update_token_holder_counts, fn repo,
                                                         %{
                                                           delete_address_current_token_balances: deleted,
                                                           derive_address_current_token_balances: inserted
                                                         } ->
-      Instrumenter.block_import_stage_runner(
-        fn ->
-          deltas = CurrentTokenBalances.token_holder_count_deltas(%{deleted: deleted, inserted: inserted})
-          Tokens.update_holder_counts_with_deltas(repo, deltas, insert_options)
-        end,
-        :address_referencing,
-        :blocks,
-        :blocks_update_token_holder_counts
-      )
+      deltas = CurrentTokenBalances.token_holder_count_deltas(%{deleted: deleted, inserted: inserted})
+      Tokens.update_holder_counts_with_deltas(repo, deltas, insert_options)
     end)
   end
 
