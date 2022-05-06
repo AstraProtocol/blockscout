@@ -53,13 +53,7 @@ if ($transactionDetailsPage.length) {
   connectElements({ store, elements })
 
   const pathParts = window.location.pathname.split('/')
-  const shouldScroll = pathParts.includes('internal-transactions') ||
-  pathParts.includes('token-transfers') ||
-  pathParts.includes('logs') ||
-  pathParts.includes('token-transfers') ||
-  pathParts.includes('raw-trace') ||
-  pathParts.includes('state')
-  if (shouldScroll) {
+  if (pathParts.length > 3 && pathParts[3] !== '') {
     document.getElementById('transaction-tabs').scrollIntoView()
   }
 
