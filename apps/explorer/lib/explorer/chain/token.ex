@@ -24,7 +24,7 @@ defmodule Explorer.Chain.Token do
 
   alias Ecto.Changeset
   alias Explorer.Chain.{Address, Hash, Token}
-  alias Explorer.SmartContract.Helper
+  alias Phoenix.HTML
 
   @typedoc """
   * `name` - Name of the token
@@ -37,6 +37,7 @@ defmodule Explorer.Chain.Token do
   * `contract_address_hash` - Address hash foreign key
   * `holder_count` - the number of `t:Explorer.Chain.Address.t/0` (except the burn address) that have a
     `t:Explorer.Chain.CurrentTokenBalance.t/0` `value > 0`.  Can be `nil` when data not migrated.
+  * `bridged` - Flag for bridged tokens from other chain
   """
   @type t :: %Token{
           name: String.t(),
@@ -48,6 +49,7 @@ defmodule Explorer.Chain.Token do
           contract_address: %Ecto.Association.NotLoaded{} | Address.t(),
           contract_address_hash: Hash.Address.t(),
           holder_count: non_neg_integer() | nil,
+          bridged: boolean(),
           skip_metadata: boolean()
         }
 
@@ -76,6 +78,7 @@ defmodule Explorer.Chain.Token do
     field(:type, :string)
     field(:cataloged, :boolean)
     field(:holder_count, :integer)
+    field(:bridged, :boolean)
     field(:skip_metadata, :boolean)
 
     belongs_to(
@@ -91,7 +94,7 @@ defmodule Explorer.Chain.Token do
   end
 
   @required_attrs ~w(contract_address_hash type)a
-  @optional_attrs ~w(cataloged decimals name symbol total_supply skip_metadata)a
+  @optional_attrs ~w(cataloged decimals name symbol total_supply bridged skip_metadata)a
 
   @doc false
   def changeset(%Token{} = token, params \\ %{}) do
@@ -100,8 +103,8 @@ defmodule Explorer.Chain.Token do
     |> validate_required(@required_attrs)
     |> foreign_key_constraint(:contract_address)
     |> trim_name()
-    |> sanitize_token_input(:name)
-    |> sanitize_token_input(:symbol)
+    |> sanitize_input(:name)
+    |> sanitize_input(:symbol)
     |> unique_constraint(:contract_address_hash)
   end
 
@@ -114,15 +117,20 @@ defmodule Explorer.Chain.Token do
     end
   end
 
-  defp sanitize_token_input(%Changeset{valid?: false} = changeset, _), do: changeset
+  defp sanitize_input(%Changeset{valid?: false} = changeset, _), do: changeset
 
-  defp sanitize_token_input(%Changeset{valid?: true} = changeset, key) do
+  defp sanitize_input(%Changeset{valid?: true} = changeset, key) do
     case get_change(changeset, key) do
       nil ->
         changeset
 
       property ->
-        put_change(changeset, key, Helper.sanitize_input(property))
+        safe_property =
+          property
+          |> HTML.html_escape()
+          |> HTML.safe_to_string()
+
+        put_change(changeset, key, String.trim(safe_property))
     end
   end
 
