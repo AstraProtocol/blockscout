@@ -2,31 +2,30 @@ defmodule Explorer.ExchangeRates.Source do
   @moduledoc """
   Behaviour for fetching exchange rates from external sources.
   """
-  alias Explorer.ExchangeRates.Source.{CoinGecko, TikiExchange}
-  alias Explorer.ExchangeRates.Token
+  alias Explorer.ExchangeRates.{Source, Token}
   alias HTTPoison.{Error, Response}
 
   @doc """
   Fetches exchange rates for currencies/tokens.
   """
   @spec fetch_exchange_rates(module) :: {:ok, [Token.t()]} | {:error, any}
-  def fetch_exchange_rates(_source \\ exchange_rates_source()) do
-    source_url = TikiExchange.source_url()
-    fetch_exchange_rates_request(TikiExchange, source_url, TikiExchange.headers())
+  def fetch_exchange_rates(source \\ exchange_rates_source()) do
+    source_url = source.source_url()
+    fetch_exchange_rates_request(source, source_url, source.headers())
   end
 
   @spec fetch_exchange_rates_for_token(String.t()) :: {:ok, [Token.t()]} | {:error, any}
   def fetch_exchange_rates_for_token(symbol) do
-    source_url = CoinGecko.source_url(symbol)
-    headers = CoinGecko.headers()
-    fetch_exchange_rates_request(CoinGecko, source_url, headers)
+    source = Application.get_env(:explorer, Source)[:source]
+    source_url = source.source_url(symbol)
+    fetch_exchange_rates_request(source, source_url, source.headers())
   end
 
   @spec fetch_exchange_rates_for_token_address(String.t()) :: {:ok, [Token.t()]} | {:error, any}
   def fetch_exchange_rates_for_token_address(address_hash) do
-    source_url = CoinGecko.source_url(address_hash)
-    headers = CoinGecko.headers()
-    fetch_exchange_rates_request(CoinGecko, source_url, headers)
+    source = Application.get_env(:explorer, Source)[:source]
+    source_url = source.source_url(address_hash)
+    fetch_exchange_rates_request(source, source_url, source.headers())
   end
 
   defp fetch_exchange_rates_request(_source, source_url, _headers) when is_nil(source_url),
@@ -39,7 +38,7 @@ defmodule Explorer.ExchangeRates.Source do
           result_formatted =
             result
             |> source.format_data()
-            
+
           {:ok, result_formatted}
         else
           resp
@@ -62,7 +61,7 @@ defmodule Explorer.ExchangeRates.Source do
 
   @callback source_url(String.t()) :: String.t() | :ignore
 
-  @callback headers :: [any]
+  @callback headers() :: [any]
 
   def headers do
     [{"Content-Type", "application/json"}]
@@ -88,7 +87,8 @@ defmodule Explorer.ExchangeRates.Source do
 
   @spec exchange_rates_source() :: module()
   defp exchange_rates_source do
-    config(:source) || Explorer.ExchangeRates.Source.TikiExchange
+    source = Application.get_env(:explorer, Source)[:source]
+    config(:source) || source
   end
 
   @spec config(atom()) :: term
