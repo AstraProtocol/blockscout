@@ -5,7 +5,7 @@ import humps from 'humps'
 import numeral from 'numeral'
 import { DateTime } from 'luxon'
 import { formatUsdValue } from '../lib/currency'
-import sassVariables from '../../css/app.scss'
+import sassVariables from '../../css/export-vars-to-js.module.scss'
 
 Chart.defaults.font.family = 'Nunito, "Helvetica Neue", Arial, sans-serif,"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"'
 Chart.register(LineController, LineElement, PointElement, LinearScale, TimeScale, Title, Tooltip)
@@ -89,7 +89,7 @@ const config = {
         grid,
         ticks: {
           beginAtZero: true,
-          callback: (value, _index, _values) => `${numeral(value).format('0,0')} ₫`,
+          callback: (value, _index, _values) => `$${numeral(value).format('0,0.00')}`,
           maxTicksLimit: 4,
           color: sassVariables.dashboardBannerChartAxisFontColor
         }
@@ -117,6 +117,10 @@ const config = {
     },
     plugins: {
       legend,
+      title: {
+        display: true,
+        color: sassVariables.dashboardBannerChartAxisFontColor
+      },
       tooltip: {
         mode: 'index',
         intersect: false,
@@ -254,8 +258,18 @@ class MarketHistoryChart {
     }
 
     this.availableSupply = availableSupply
-    // config.data.datasets = [this.price, this.marketCap, this.numTransactions]
-    config.data.datasets = [this.price]
+
+    const txChartTitle = 'Daily transactions'
+    const marketChartTitle = 'Daily price and market cap'
+    let chartTitle = ''
+    if (Object.keys(dataConfig).join() === 'transactions') {
+      chartTitle = txChartTitle
+    } else if (Object.keys(dataConfig).join() === 'market') {
+      chartTitle = marketChartTitle
+    }
+    config.options.plugins.title.text = chartTitle
+
+    config.data.datasets = [this.price, this.marketCap, this.numTransactions]
 
     const isChartLoadedKey = 'isChartLoaded'
     const isChartLoaded = window.sessionStorage.getItem(isChartLoadedKey) === 'true'
@@ -273,9 +287,9 @@ class MarketHistoryChart {
     if (this.availableSupply !== null && typeof this.availableSupply === 'object') {
       const today = new Date().toJSON().slice(0, 10)
       this.availableSupply[today] = availableSupply
-      // this.marketCap.data = getMarketCapData(marketHistoryData, this.availableSupply)
+      this.marketCap.data = getMarketCapData(marketHistoryData, this.availableSupply)
     } else {
-      // this.marketCap.data = getMarketCapData(marketHistoryData, availableSupply)
+      this.marketCap.data = getMarketCapData(marketHistoryData, availableSupply)
     }
     this.chart.update()
   }
