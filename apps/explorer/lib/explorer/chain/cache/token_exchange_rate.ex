@@ -1,16 +1,21 @@
 defmodule Explorer.Chain.Cache.TokenExchangeRate do
   @moduledoc """
-  Caches Token VND exchange_rate.
+  Caches Token USD exchange_rate.
   """
   use GenServer
 
+  import Ecto.Query, only: [from: 2]
+
+  alias Ecto.Changeset
+  alias Explorer.Chain.BridgedToken
   alias Explorer.Counters.Helper
   alias Explorer.ExchangeRates.Source
+  alias Explorer.Repo
 
   @cache_name :token_exchange_rate
   @last_update_key "last_update"
 
-  config = Application.compile_env(:explorer, Explorer.Chain.Cache.TokenExchangeRate)
+  config = Application.get_env(:explorer, Explorer.Chain.Cache.TokenExchangeRate)
   @enable_consolidation Keyword.get(config, :enable_consolidation)
 
   @spec start_link(term()) :: GenServer.on_start()
@@ -56,7 +61,11 @@ defmodule Explorer.Chain.Cache.TokenExchangeRate do
       |> cache_key()
       |> fetch_from_cache()
 
-    cached_value
+    if is_nil(cached_value) || cached_value == :not_found_coingecko || Decimal.cmp(cached_value, 0) == :eq do
+      fetch_from_db(token_hash)
+    else
+      cached_value
+    end
   end
 
   # fetching by symbol is not recommended to use because of possible collisions
@@ -73,7 +82,11 @@ defmodule Explorer.Chain.Cache.TokenExchangeRate do
       |> cache_key()
       |> fetch_from_cache()
 
-    cached_value
+    if is_nil(cached_value) || cached_value == :not_found_coingecko || Decimal.cmp(cached_value, 0) == :eq do
+      fetch_from_db(token_hash)
+    else
+      cached_value
+    end
   end
 
   def cache_name, do: @cache_name
@@ -98,45 +111,59 @@ defmodule Explorer.Chain.Cache.TokenExchangeRate do
     is_nil(value) || value == 0
   end
 
-  defp update_cache_by_symbol(_token_hash, symbol) do
+  defp update_cache_by_symbol(token_hash, symbol) do
     put_into_cache("#{cache_key(symbol)}_#{@last_update_key}", Helper.current_time())
 
-    exchange_rate = fetch_token_exchange_rate(symbol, true)
+    exchange_rate = fetch_token_exchange_rate(symbol)
 
+    put_into_db(token_hash, exchange_rate)
     put_into_cache(cache_key(symbol), exchange_rate)
   end
 
-  defp update_cache_by_address_hash_str(_token_hash, address_hash_str) do
+  defp update_cache_by_address_hash_str(token_hash, address_hash_str) do
     put_into_cache("#{cache_key(address_hash_str)}_#{@last_update_key}", Helper.current_time())
 
-    exchange_rate = fetch_token_exchange_rate_by_address(address_hash_str, true)
+    exchange_rate = fetch_token_exchange_rate_by_address(address_hash_str)
 
+    put_into_db(token_hash, exchange_rate)
     put_into_cache(cache_key(address_hash_str), exchange_rate)
   end
 
-  def fetch_token_exchange_rate(symbol, internal_call? \\ false) do
+  def fetch_token_exchange_rate(symbol) do
     case Source.fetch_exchange_rates_for_token(symbol) do
       {:ok, [rates]} ->
         rates.usd_value
 
       {:error, "Could not find coin with the given id"} ->
-        if internal_call?, do: :not_found_coingecko, else: nil
+        :not_found_coingecko
 
       _ ->
         nil
     end
   end
 
-  def fetch_token_exchange_rate_by_address(address_hash_str, internal_call? \\ false) do
+  def fetch_token_exchange_rate_by_address(address_hash_str) do
     case Source.fetch_exchange_rates_for_token_address(address_hash_str) do
       {:ok, [rates]} ->
         rates.usd_value
 
       {:error, "Could not find coin with the given id"} ->
-        if internal_call?, do: :not_found_coingecko, else: nil
+        :not_found_coingecko
 
       _ ->
         nil
+    end
+  end
+
+  defp fetch_from_db(nil), do: nil
+
+  defp fetch_from_db(token_hash) do
+    token = get_token(token_hash)
+
+    if token do
+      token.exchange_rate
+    else
+      nil
     end
   end
 
@@ -148,6 +175,26 @@ defmodule Explorer.Chain.Cache.TokenExchangeRate do
     if cache_table_exists?() do
       :ets.insert(@cache_name, {key, value})
     end
+  end
+
+  def put_into_db(token_hash, exchange_rate) do
+    token = get_token(token_hash)
+
+    if token && !is_nil(exchange_rate) && exchange_rate != :not_found_coingecko do
+      token
+      |> Changeset.change(%{exchange_rate: exchange_rate})
+      |> Repo.update()
+    end
+  end
+
+  defp get_token(token_hash) do
+    query =
+      from(bt in BridgedToken,
+        where: bt.home_token_contract_address_hash == ^token_hash
+      )
+
+    query
+    |> Repo.one()
   end
 
   def cache_table_exists? do
