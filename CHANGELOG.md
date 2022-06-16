@@ -3,6 +3,7 @@
 ### Features
 
 ### Fixes
+- [#5680](https://github.com/blockscout/blockscout/pull/5680) - Fix broken token icons; Disable animation in lists; Fix doubled requests for some pages
 - [#5671](https://github.com/blockscout/blockscout/pull/5671) - Fix double requests for token exchange rates; Disable fetching `btc_value` by default (add `EXCHANGE_RATES_FETCH_BTC_VALUE` env variable); Add `CACHE_EXCHANGE_RATES_PERIOD` env variable
 
 ### Chore
