@@ -35,8 +35,7 @@ config :logger,
     {LoggerFileBackend, :pending_transactions_to_refetch},
     {LoggerFileBackend, :empty_blocks_to_refetch},
     {LoggerFileBackend, :api},
-    {LoggerFileBackend, :block_import_timings},
-    {LoggerFileBackend, :account}
+    {LoggerFileBackend, :block_import_timings}
   ]
 
 config :logger, :console,
