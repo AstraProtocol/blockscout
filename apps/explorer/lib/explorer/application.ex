@@ -43,8 +43,6 @@ defmodule Explorer.Application do
     base_children = [
       Explorer.Repo,
       Explorer.Repo.Replica1,
-      Explorer.Repo.Account,
-      Explorer.Vault,
       Supervisor.child_spec({SpandexDatadog.ApiServer, datadog_opts()}, id: SpandexDatadog.ApiServer),
       Supervisor.child_spec({Task.Supervisor, name: Explorer.HistoryTaskSupervisor}, id: Explorer.HistoryTaskSupervisor),
       Supervisor.child_spec({Task.Supervisor, name: Explorer.MarketTaskSupervisor}, id: Explorer.MarketTaskSupervisor),
@@ -67,8 +65,7 @@ defmodule Explorer.Application do
       con_cache_child_spec(RSK.cache_name(), ttl_check_interval: :timer.minutes(1), global_ttl: :timer.minutes(30)),
       Transactions,
       Accounts,
-      Uncles,
-      {Redix, redix_opts()}
+      Uncles
     ]
 
     children = base_children ++ configurable_children()
@@ -85,10 +82,6 @@ defmodule Explorer.Application do
       configure(Explorer.KnownTokens),
       configure(Explorer.Market.History.Cataloger),
       configure(Explorer.Chain.Cache.TokenExchangeRate),
-      configure(Explorer.Chain.Cache.ContractsCounter),
-      configure(Explorer.Chain.Cache.NewContractsCounter),
-      configure(Explorer.Chain.Cache.VerifiedContractsCounter),
-      configure(Explorer.Chain.Cache.NewVerifiedContractsCounter),
       configure(Explorer.Chain.Transaction.History.Historian),
       configure(Explorer.Chain.Events.Listener),
       configure(Explorer.Counters.AddressesWithBalanceCounter),
@@ -104,7 +97,6 @@ defmodule Explorer.Application do
       configure(Explorer.Counters.AverageBlockTime),
       configure(Explorer.Counters.Bridge),
       configure(Explorer.Validator.MetadataProcessor),
-      configure(Explorer.Tags.AddressTag.Cataloger),
       configure(MinMissingBlockNumber)
     ]
     |> List.flatten()
@@ -181,9 +173,5 @@ defmodule Explorer.Application do
       },
       id: {ConCache, name}
     )
-  end
-
-  defp redix_opts do
-    {System.get_env("ACCOUNT_REDIS_URL") || "redis://127.0.0.1:6379", [name: :redix]}
   end
 end

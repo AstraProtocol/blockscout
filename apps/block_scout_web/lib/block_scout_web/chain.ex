@@ -24,7 +24,6 @@ defmodule BlockScoutWeb.Chain do
     Block,
     InternalTransaction,
     Log,
-    SmartContract,
     Token,
     TokenTransfer,
     Transaction,
@@ -217,10 +216,6 @@ defmodule BlockScoutWeb.Chain do
     [paging_options: %{@default_paging_options | key: {name, type, value}}]
   end
 
-  def paging_options(%{"smart_contract_id" => id}) do
-    [paging_options: %{@default_paging_options | key: {id}}]
-  end
-
   def paging_options(_params), do: [paging_options: @default_paging_options]
 
   def put_key_value_to_paging_options([paging_options: paging_options], key, value) do
@@ -235,11 +230,6 @@ defmodule BlockScoutWeb.Chain do
       _ ->
         1
     end
-  end
-
-  def fetch_page_number(%{"items_count" => item_count_str}) do
-    {items_count, _} = Integer.parse(item_count_str)
-    div(items_count, @page_size) + 1
   end
 
   def fetch_page_number(_), do: 1
@@ -278,20 +268,6 @@ defmodule BlockScoutWeb.Chain do
   end
 
   def split_list_by_page(list_plus_one), do: Enum.split(list_plus_one, @page_size)
-
-  def next_page_path(next_page_params) do
-    "&" <> to_string(Map.keys(next_page_params)
-                     |> Enum.map(fn key -> "#{key}=#{next_page_params[key]}" end)
-                     |> Enum.join("&"))
-  end
-
-  def get_next_page_number(cur_page_number) do
-    if cur_page_number < 1 do
-      2
-    else
-      cur_page_number + 1
-    end
-  end
 
   defp address_from_param(param) do
     case string_to_address_hash(param) do
@@ -365,16 +341,12 @@ defmodule BlockScoutWeb.Chain do
     %{"address_hash" => to_string(address_hash), "value" => Decimal.to_integer(value)}
   end
 
-  defp paging_params({%CurrentTokenBalance{value: value}, %Token{name: name, type: type}}) do
+  defp paging_params({%CurrentTokenBalance{value: value}, _, %Token{name: name, type: type}}) do
     %{"token_name" => name, "token_type" => type, "value" => Decimal.to_integer(value)}
   end
 
   defp paging_params(%CoinBalance{block_number: block_number}) do
     %{"block_number" => block_number}
-  end
-
-  defp paging_params(%SmartContract{} = smart_contract) do
-    %{"smart_contract_id" => smart_contract.id}
   end
 
   defp paging_params(%{
