@@ -8,7 +8,6 @@ jobs:
   build_docker:
     steps:
       - build_image:
-          buildkit: true
           dockerfile: docker/Dockerfile
   publish_docker:
     steps:
@@ -21,14 +20,6 @@ jobs:
           workload: blockscout
           argocd_pipeline: generic-v2
           deployment_config: dev
-  deploy_dev_v1:
-    steps:
-      - deploy_dev:
-          cluster: dev
-          namespace: astra
-          workload: blockscout_v1
-          argocd_pipeline: generic-v2
-          deployment_config: dev_v1
   deploy_prod:
     steps:
       - deploy_production:
@@ -42,7 +33,7 @@ workflows:
           filters:
             branches:
               only:
-                - astra
+                - astra 
                 - dev
       - publish_docker:
           requires:
@@ -53,13 +44,6 @@ workflows:
                 - astra
                 - dev
       - deploy_dev:
-          requires:
-            - publish_docker
-          filters:
-            branches:
-              only:
-                - dev
-      - deploy_dev_v1:
           requires:
             - publish_docker
           filters:
@@ -80,15 +64,7 @@ deployment_config:
         - host: blockscout.dev.tiki.services
           paths:
             - path: /
-              port: '4000'
-    replicaCount: 1
-  dev_v1:
-    ingress:
-      hosts:
-        - host: blockscout-v1.dev.tiki.services
-          paths:
-            - path: /
-              port: '4000'
+              port: '80'
     replicaCount: 1
   prod:
     ingress:
@@ -96,5 +72,5 @@ deployment_config:
         - host: blockscout.tiki.services
           paths:
             - path: /
-              port: '4000'
+              port: '80'
     replicaCount: 1
