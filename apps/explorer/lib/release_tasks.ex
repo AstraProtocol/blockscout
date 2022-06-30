@@ -29,6 +29,19 @@ defmodule Explorer.ReleaseTasks do
     Enum.each(@repos, &create_db_for/1)
   end
 
+  def create_and_migrate do
+    start_services()
+
+    create()
+    run_migrations()
+
+    stop_services()
+  end
+
+  def create do
+    Enum.each(@repos, &create_db_for/1)
+  end
+
   def migrate(_argv) do
     start_services()
 
