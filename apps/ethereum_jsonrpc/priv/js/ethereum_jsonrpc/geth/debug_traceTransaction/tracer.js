@@ -442,25 +442,24 @@
     },
 
     putGas(call) {
-
-        if (call.gasBigInt === undefined) {
-            call.gas = '0x0';
-        } else {
-            call.gas = '0x' + call.gasBigInt.toString(16);
-        }
-
+        let gasBigInt = call.gasBigInt;
         delete call.gasBigInt;
 
+        if (gasBigInt === undefined) {
+            gasBigInt = bigInt.zero;
+        }
+
+        call.gas = '0x' + gasBigInt.toString(16);
     },
 
     putGasUsed(call) {
+        let gasUsedBigInt = call.gasUsedBigInt;
+        delete call.gasUsedBigInt;
 
-        if (call.gasUsedBigInt === undefined) {
-            call.gasUsed = '0x0';
-        } else {
-            call.gasUsed = '0x' + call.gasUsedBigInt.toString(16);
+        if (gasUsedBigInt === undefined) {
+            gasUsedBigInt = bigInt.zero;
         }
 
-        delete call.gasUsedBigInt;
+        call.gasUsed = '0x' + gasUsedBigInt.toString(16);
     }
 }
