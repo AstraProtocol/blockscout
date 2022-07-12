@@ -8,15 +8,13 @@ defmodule Explorer.ExchangeRates.Source.TikiExchange do
 
   import Source, only: [to_decimal: 1]
 
-  require Logger
-
   @behaviour Source
 
   @impl Source
   def format_data(json_data) do
     last_updated = get_last_updated(json_data)
     current_price = get_current_price(json_data)
-    id = "ASA"
+    id = "ASTRA"
     btc_value = 0
     circulating_supply_data = Enum.at(get_supply(), 0)
     total_supply_data = 0
@@ -39,25 +37,16 @@ defmodule Explorer.ExchangeRates.Source.TikiExchange do
     ]
   end
 
-  @impl Source
-  def headers do
-    []
-  end
-
   defp get_supply() do
-    url = base_api_url() <> "/cosmos/bank/v1beta1/supply"
-    case Source.http_request(url, headers()) do
-      {:error, reason} ->
-        Logger.error("failed to get supply: ", inspect(reason))
-      {:ok, result} ->
-        if is_map(result) do
-          list_supply = result["supply"]
-          for %{"amount" => amount, "denom" => denom} when denom == "aastra" <- list_supply do
-            String.slice(amount, 0..-19)
-          end
-        else
-          [0]
-        end
+    url = "https://api.astranaut.network/cosmos/bank/v1beta1/supply"
+    {:ok, result} = Source.http_request(url)
+    if is_map(result) do
+      list_supply = result["supply"]
+      for %{"amount" => amount, "denom" => denom} when denom == "aastra" <- list_supply do
+        String.slice(amount, 0..-19)
+      end
+    else
+      [0]
     end
   end
 
@@ -116,11 +105,6 @@ defmodule Explorer.ExchangeRates.Source.TikiExchange do
     end
   end
 
-  @spec base_api_url :: String.t()
-  defp base_api_url() do
-    System.get_env("API_NODE_URL")
-  end
-
   defp base_url do
     config(:base_url) || "https://api.tiki.vn/sandseel/api/v2/public/markets/astra/summary"
   end
@@ -145,7 +129,7 @@ defmodule Explorer.ExchangeRates.Source.TikiExchange do
 
       symbol_downcase = String.downcase(symbol)
 
-      case Source.http_request(url, headers()) do
+      case Source.http_request(url) do
         {:ok, data} = resp ->
           if is_list(data) do
             symbol_data =
