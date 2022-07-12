@@ -4,12 +4,7 @@
     <div class="row footer-logo-row">
       <div class="col-md-12">
         <%= link to: webapp_url(@conn), class: "footer-brand" do %>
-          <%= if logo_footer() do %>
-            <img class="footer-logo" src="<%= static_path(@conn, logo_footer()) %>" alt="<%= subnetwork_title() %>" />
-          <% end %>
-          <%= if logo_text() do %>
-            <span class="logo-text in-footer <%= unless logo_footer(), do: "no-logo" %>"> <%= logo_text() %> </span>
-          <% end %>
+          <img class="footer-logo" src="<%= static_path(@conn, logo_footer()) %>" alt="<%= subnetwork_title() %>" />
         <% end %>
       </div>
     </div>
@@ -19,19 +14,14 @@
 
     <div class="row">
       <div class="col-xs-12 col-lg-3">
-        <p class="footer-info-text"><%= gettext("Blockscout is a tool for inspecting and analyzing EVM based blockchains.") %></p>
+        <p class="footer-info-text"><%= gettext("Blockscout is a tool for inspecting and analyzing EVM based blockchains. Blockchain explorer for the Astra Protocol.") %></p>
         <div class="footer-social-icons">
-          <a href="<%= Application.get_env(:block_scout_web, :footer)[:github_link] %>" rel="noreferrer" target="_blank" class="footer-social-icon" title='<%= gettext("Github") %>'>
-            <div class="footer-social-icon-container fontawesome-icon github"></div>
+          <a href="https://github.com/AstraProtocol/astra" rel="noreferrer" target="_blank" class="footer-social-icon" title='<%= gettext("Github") %>'>
+              <div class="footer-social-icon-container fontawesome-icon github"></div>
           </a>
-          <a href="https://www.twitter.com/AstraOfficial5/" rel="noreferrer" target="_blank" class="footer-social-icon" title='<%= gettext("Twitter") %>'>
-            <div class="footer-social-icon-container fontawesome-icon twitter"></div>
-          </a>
+
           <a href="https://t.me/AstraOfficialChannel" rel="noreferrer" target="_blank" class="footer-social-icon" title='<%= gettext("Telegram") %>'>
             <div class="footer-social-icon-container fontawesome-icon telegram"></div>
-          </a>
-          <a href="https://www.facebook.com/groups/astra.s2e/" rel="noreferrer" target="_blank" class="footer-social-icon" title='<%= gettext("Facebook") %>'>
-            <div class="footer-social-icon-container fontawesome-icon facebook"></div>
           </a>
         </div>
       </div>
@@ -40,12 +30,7 @@
         <h3>BlockScout</h3>
         <ul>
           <li><a href="<%= issue_link(@conn) %>" rel="noreferrer" class="footer-link" target="_blank"><%= gettext("Submit an Issue") %></a></li>
-          <li><a href="<%= Application.get_env(:block_scout_web, :footer)[:github_link] %>" rel="noreferrer" class="footer-link"><%= gettext("Contribute") %></a></li>
-          <li><a href="<%= Application.get_env(:block_scout_web, :footer)[:chat_link] %>" rel="noreferrer" class="footer-link"><%= gettext("Chat (#blockscout)") %></a></li>
-          <%= if Application.get_env(:block_scout_web, :footer)[:enable_forum_link] do %>
-            <li><a href="<%= Application.get_env(:block_scout_web, :footer)[:forum_link] %>" rel="noreferrer" class="footer-link"><%= gettext("Forum") %></a></li>
-          <% end %>
-          <%= render BlockScoutWeb.LayoutView, "_add_chain_to_mm.html" %>
+          <li><a href="https://github.com/AstraProtocol/blockscout" rel="noreferrer" class="footer-link"><%= gettext("Contribute") %></a></li>
         </ul>
       </div>
       <% main_nets = main_nets(other_networks()) %>

@@ -2,29 +2,24 @@ import $ from 'jquery'
 import numeral from 'numeral'
 import { BigNumber } from 'bignumber.js'
 
+
 export function formatUsdValue (value) {
-  const formattedValue = formatCurrencyValue(value)
-  if (formattedValue === 'N/A') {
-    return formattedValue
-  } else {
-    return `${formattedValue} VND`
-  }
+  return `${formatCurrencyValue(value)} ₫`
 }
 
 function formatTokenUsdValue (value) {
-  return formatCurrencyValue(value, '@')
+  return formatCurrencyValue(value, '₫')
 }
 
 function formatCurrencyValue (value, symbol) {
   symbol = symbol || ''
-  if (isNaN(value)) return 'N/A'
-  if (value === 0 || value === '0') return `0.00 ${symbol}`
-  if (value < 0.000001) return `${window.localized['Less than']} 0.000001 ${symbol}`
-  if (value < 1000) return `${numeral(value).format('0,0')} ${symbol}`
-  if (value < 1000000) return `${numeral(value).format('0,0')} ${symbol}`
-  if (value < 1000000000) return `${numeral(value / (10 ** 6)).format('0,0')} Million ${symbol}`
-  if (value > 1000000000) return `${numeral(value / (10 ** 9)).format('0,0')} Billion ${symbol}`
-  return `${numeral(value).format('0,0')} ${symbol}`
+  if (isNaN(value) || value === '0') return 'N/A'
+  if (value === 0) return `${symbol}0.000000`
+  if (value < 0.000001) return `${window.localized['Less than']} ${symbol}0.000001`
+  if (value < 1) return `${symbol}${numeral(value).format('0.000000')}`
+  if (value < 100000) return `${symbol}${numeral(value).format('0,0.00')}`
+  if (value > 1000000000000) return `${symbol}${numeral(value).format('0.000e+0')}`
+  return `${symbol}${numeral(value).format('0,0')}`
 }
 
 function weiToEther (wei) {
@@ -55,10 +50,7 @@ function tryUpdateCalculatedUsdValues (el, usdExchangeRate = el.dataset.usdExcha
   const ether = weiToEther(el.dataset.weiValue)
   const usd = etherToUSD(ether, usdExchangeRate)
   const formattedUsd = formatUsdValue(usd)
-  if (formattedUsd !== el.innerHTML) {
-    $(el).data('rawUsdValue', usd)
-    el.innerHTML = formattedUsd
-  }
+  if (formattedUsd !== el.innerHTML) el.innerHTML = formattedUsd
 }
 
 function tryUpdateUnitPriceValues (el, usdUnitPrice = el.dataset.usdUnitPrice) {
