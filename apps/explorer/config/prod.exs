@@ -3,16 +3,10 @@ import Config
 # Configures the database
 config :explorer, Explorer.Repo,
   prepare: :unnamed,
-  timeout: :timer.seconds(60),
-  migration_lock: nil
+  timeout: :timer.seconds(60)
 
 # Configures API the database
 config :explorer, Explorer.Repo.Replica1,
-  prepare: :unnamed,
-  timeout: :timer.seconds(60)
-
-# Configures Account database
-config :explorer, Explorer.Repo.Account,
   prepare: :unnamed,
   timeout: :timer.seconds(60)
 

@@ -1,8 +1,5 @@
 import Config
 
-alias EthereumJSONRPC.Variant
-alias Explorer.Repo.ConfigHelper
-
 ######################
 ### BlockScout Web ###
 ######################
@@ -27,33 +24,40 @@ config :block_scout_web, BlockScoutWeb.Endpoint,
 
 pool_size =
   if System.get_env("DATABASE_READ_ONLY_API_URL"),
-    do: ConfigHelper.get_db_pool_size("50"),
-    else: ConfigHelper.get_db_pool_size("40")
+    do: String.to_integer(System.get_env("POOL_SIZE", "50")),
+    else: String.to_integer(System.get_env("POOL_SIZE", "40"))
 
 # Configures the database
 config :explorer, Explorer.Repo,
   url: System.get_env("DATABASE_URL"),
   pool_size: pool_size,
-  ssl: ConfigHelper.ssl_enabled?()
+  ssl: String.equivalent?(System.get_env("ECTO_USE_SSL") || "true", "true")
+
+database_api_url =
+  if System.get_env("DATABASE_READ_ONLY_API_URL"),
+    do: System.get_env("DATABASE_READ_ONLY_API_URL"),
+    else: System.get_env("DATABASE_URL")
 
 pool_size_api =
   if System.get_env("DATABASE_READ_ONLY_API_URL"),
-    do: ConfigHelper.get_api_db_pool_size("50"),
-    else: ConfigHelper.get_api_db_pool_size("10")
+    do: String.to_integer(System.get_env("POOL_SIZE_API", "50")),
+    else: String.to_integer(System.get_env("POOL_SIZE_API", "10"))
 
 # Configures API the database
 config :explorer, Explorer.Repo.Replica1,
-  url: ConfigHelper.get_api_db_url(),
+  url: database_api_url,
   pool_size: pool_size_api,
-  ssl: ConfigHelper.ssl_enabled?()
+  ssl: String.equivalent?(System.get_env("ECTO_USE_SSL") || "true", "true")
 
-# Configures Account database
-config :explorer, Explorer.Repo.Account,
-  url: ConfigHelper.get_account_db_url(),
-  pool_size: ConfigHelper.get_account_db_pool_size("50"),
-  ssl: ConfigHelper.ssl_enabled?()
-
-variant = Variant.get()
+variant =
+  if is_nil(System.get_env("ETHEREUM_JSONRPC_VARIANT")) do
+    "parity"
+  else
+    System.get_env("ETHEREUM_JSONRPC_VARIANT")
+    |> String.split(".")
+    |> List.last()
+    |> String.downcase()
+  end
 
 Code.require_file("#{variant}.exs", "apps/explorer/config/prod")
 

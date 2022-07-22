@@ -1,8 +1,5 @@
 import Config
 
-alias EthereumJSONRPC.Variant
-alias Explorer.Repo.ConfigHelper
-
 ######################
 ### BlockScout Web ###
 ######################
@@ -22,7 +19,9 @@ config :block_scout_web, BlockScoutWeb.Endpoint,
   ],
   url: [
     scheme: "http",
-    host: System.get_env("BLOCKSCOUT_HOST", "localhost")
+    host: System.get_env("BLOCKSCOUT_HOST") || "localhost",
+    path: System.get_env("NETWORK_PATH") || "/",
+    api_path: System.get_env("API_PATH") || "/"
   ],
   https: [
     port: (port && port + 1) || 4001,
@@ -42,10 +41,15 @@ config :block_scout_web, BlockScoutWeb.Endpoint,
 database = if System.get_env("DATABASE_URL"), do: nil, else: "explorer_dev"
 hostname = if System.get_env("DATABASE_URL"), do: nil, else: "localhost"
 
+database_api_url =
+  if System.get_env("DATABASE_READ_ONLY_API_URL"),
+    do: System.get_env("DATABASE_READ_ONLY_API_URL"),
+    else: System.get_env("DATABASE_URL")
+
 pool_size =
   if System.get_env("DATABASE_READ_ONLY_API_URL"),
-    do: ConfigHelper.get_db_pool_size("30"),
-    else: ConfigHelper.get_db_pool_size("40")
+    do: String.to_integer(System.get_env("POOL_SIZE", "40")),
+    else: String.to_integer(System.get_env("POOL_SIZE", "50"))
 
 # Configure your database
 config :explorer, Explorer.Repo,
@@ -57,24 +61,27 @@ config :explorer, Explorer.Repo,
 database_api = if System.get_env("DATABASE_READ_ONLY_API_URL"), do: nil, else: database
 hostname_api = if System.get_env("DATABASE_READ_ONLY_API_URL"), do: nil, else: hostname
 
+pool_size_api =
+  if System.get_env("DATABASE_READ_ONLY_API_URL"),
+    do: String.to_integer(System.get_env("POOL_SIZE_API", "50")),
+    else: String.to_integer(System.get_env("POOL_SIZE_API", "10"))
+
 # Configure API database
 config :explorer, Explorer.Repo.Replica1,
   database: database_api,
   hostname: hostname_api,
-  url: ConfigHelper.get_api_db_url(),
-  pool_size: ConfigHelper.get_api_db_pool_size("10")
+  url: database_api_url,
+  pool_size: pool_size_api
 
-database_account = if System.get_env("ACCOUNT_DATABASE_URL"), do: nil, else: database
-hostname_account = if System.get_env("ACCOUNT_DATABASE_URL"), do: nil, else: hostname
-
-# Configure Account database
-config :explorer, Explorer.Repo.Account,
-  database: database_account,
-  hostname: hostname_account,
-  url: ConfigHelper.get_account_db_url(),
-  pool_size: ConfigHelper.get_account_db_pool_size("10")
-
-variant = Variant.get()
+variant =
+  if is_nil(System.get_env("ETHEREUM_JSONRPC_VARIANT")) do
+    "ganache"
+  else
+    System.get_env("ETHEREUM_JSONRPC_VARIANT")
+    |> String.split(".")
+    |> List.last()
+    |> String.downcase()
+  end
 
 Code.require_file("#{variant}.exs", "apps/explorer/config/dev")
 
