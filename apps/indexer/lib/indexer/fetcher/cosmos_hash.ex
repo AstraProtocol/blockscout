@@ -1,6 +1,6 @@
 defmodule Indexer.Fetcher.CosmosHash do
   @moduledoc """
-  Fetches `:cosmos_hash`.
+  Fetches and indexes `t:Explorer.Chain.CosmosHash.t/0`.
 
   See `async_fetch/1` for details on configuring limits.
   """
@@ -10,14 +10,14 @@ defmodule Indexer.Fetcher.CosmosHash do
 
   require Logger
 
+  alias HTTPoison.{Error, Response}
   alias Explorer.Chain
   alias Indexer.{BufferedTask, Tracer}
-  alias Indexer.Fetcher.CosmosHash.Supervisor, as: CosmosHashSupervisor
 
   @behaviour BufferedTask
 
   @max_batch_size 10
-  @max_concurrency 1
+  @max_concurrency 4
   @defaults [
     flush_interval: :timer.seconds(3),
     max_concurrency: @max_concurrency,
@@ -29,14 +29,23 @@ defmodule Indexer.Fetcher.CosmosHash do
 
   @doc """
   Asynchronously fetches cosmos hashes.
+
+  ## Limiting Upstream Load
+
+  Internal transactions are an expensive upstream operation. The number of
+  results to fetch is configured by `@max_batch_size` and represents the number
+  of transaction hashes to request internal transactions in a single JSONRPC
+  request. Defaults to `#{@max_batch_size}`.
+
+  The `@max_concurrency` attribute configures the  number of concurrent requests
+  of `@max_batch_size` to allow against the JSONRPC. Defaults to `#{@max_concurrency}`.
+
+  *Note*: The internal transactions for individual transactions cannot be paginated,
+  so the total number of internal transactions that could be produced is unknown.
   """
   @spec async_fetch([Block.block_number()]) :: :ok
   def async_fetch(block_numbers, timeout \\ 5000) when is_list(block_numbers) do
-    if CosmosHashSupervisor.disabled?() do
-      :ok
-    else
-      BufferedTask.buffer(__MODULE__, block_numbers, timeout)
-    end
+    BufferedTask.buffer(__MODULE__, block_numbers, timeout)
   end
 
   @doc false
@@ -52,7 +61,7 @@ defmodule Indexer.Fetcher.CosmosHash do
   @impl BufferedTask
   def init(initial, reducer, _) do
     {:ok, final} =
-      Chain.stream_block_numbers_with_unfetched_cosmos_hashes(initial, fn block_number, acc ->
+      Chain.stream_transactions_with_unfetched_cosmos_hashes(initial, fn block_number, acc ->
           reducer.(block_number, acc)
       end)
     final
@@ -66,115 +75,81 @@ defmodule Indexer.Fetcher.CosmosHash do
               tracer: Tracer
             )
   def run(block_numbers, _) do
-    unique_numbers = Enum.uniq(block_numbers) |> Enum.filter(fn number ->
-      is_nil(number) == false
+    unique_numbers = Enum.uniq(block_numbers)
+    Logger.info("TRUNG")
+    Enum.each(unique_numbers, fn(block_number) ->
+      Logger.info(block_number)
     end)
     Logger.debug("fetching cosmos hashes for transactions")
-    case unique_numbers do
-      [nil] ->
-        {:retry, block_numbers}
-      [] ->
-        {:retry, block_numbers}
-      [_|_] ->
-        Enum.each(unique_numbers, &fetch_and_import_cosmos_hash/1)
+
+  end
+
+  defp base_url() do
+    "https://api.astranaut.dev/cosmos/base/tendermint/v1beta1/blocks/"
+  end
+
+  defp raw_txn_to_cosmos_hash(raw_txn) do
+    Base.encode16(:crypto.hash(:sha256, elem(Base.decode64(raw_txn), 1)))
+  end
+
+  defp headers do
+    [{"Content-Type", "application/json"}]
+  end
+
+  defp decode_json(data) do
+    Jason.decode!(data)
+  rescue
+    _ -> data
+  end
+
+  defp parse_http_success_response(body) do
+    body_json = decode_json(body)
+
+    cond do
+      is_map(body_json) ->
+        {:ok, body_json}
+
+      is_list(body_json) ->
+        {:ok, body_json}
+
+      true ->
+        {:ok, body}
     end
   end
 
-  def get_cosmos_hash_params_by_range(range) do
-    case range do
-      nil ->
-        Logger.info("range is nil")
-        []
-      _ ->
-        block_numbers = Enum.map(range, fn(number) -> number end)
-        for block_number <- block_numbers do
-          %{block_number => get_cosmos_hash_tx_list_mapping(block_number)}
-        end
+  defp parse_http_error_response(body) do
+    body_json = decode_json(body)
+
+    if is_map(body_json) do
+      {:error, body_json["error"]}
+    else
+      {:error, body}
     end
   end
 
-  def put(transactions_without_cosmos_hashes, params) when is_list(transactions_without_cosmos_hashes) do
-    case params do
-      [_|_] ->
-        Enum.map(transactions_without_cosmos_hashes, fn transaction_params ->
-          block_number = transaction_params[:block_number]
-          cosmos_hash_params = Enum.find(params, fn param ->
-            is_nil(param[block_number]) == false
-          end) |> Enum.at(0) |> elem(1)
+  defp http_request(source_url) do
+    case HTTPoison.get(source_url, headers()) do
+      {:ok, %Response{body: body, status_code: 200}} ->
+        parse_http_success_response(body)
 
-          param_cosmos = Enum.find(cosmos_hash_params, fn param ->
-            param[:hash] == transaction_params[:hash]
-          end)
+      {:ok, %Response{body: body, status_code: status_code}} when status_code in 400..526 ->
+        parse_http_error_response(body)
 
-          if is_nil(param_cosmos) == false do
-            Map.put_new(transaction_params, :cosmos_hash, param_cosmos[:cosmos_hash])
-          else
-            Map.put_new(transaction_params, :cosmos_hash, nil)
-          end
-        end)
-      _ ->
-        Enum.map(transactions_without_cosmos_hashes, fn transaction_params ->
-          Map.put_new(transaction_params, :cosmos_hash, nil)
-        end)
+      {:ok, %Response{status_code: status_code}} when status_code in 300..308 ->
+        {:error, "Source redirected"}
+
+      {:ok, %Response{status_code: _status_code}} ->
+        {:error, "Source unexpected status code"}
+
+      {:error, %Error{reason: reason}} ->
+        {:error, reason}
+
+      {:error, :nxdomain} ->
+        {:error, "Source is not responsive"}
+
+      {:error, _} ->
+        {:error, "Source unknown response"}
     end
   end
 
-  defp get_cosmos_hash_tx_list_mapping(block_number) do
-    case Indexer.HttpRequest.http_request(block_info_url() <> Integer.to_string(block_number)) do
-      {:error, _reason} ->
-        Logger.error("failed to fetch block info via api node")
-        []
-      {:ok, result} ->
-        case result["block"]["data"]["txs"] do
-          nil ->
-            Logger.debug("block_number: #{block_number} does not have any transactions")
-            []
-          [] ->
-            Logger.debug("block_number: #{block_number} does not have any transactions")
-            []
-          [_|_] ->
-            for tx <- result["block"]["data"]["txs"] do
-              ethermint_hash = Indexer.TxParser.raw_tx_to_ethereum_tx_hash(tx)
-              cosmos_hash = Indexer.TxParser.raw_tx_to_cosmos_tx_hash(tx)
-              %{hash: ethermint_hash, cosmos_hash: cosmos_hash}
-            end
-        end
-    end
-  end
-
-  defp fetch_and_import_cosmos_hash(block_number) when is_nil(block_number) == false do
-    tx_hashes_string = Chain.get_tx_hashes_of_block_number_with_unfetched_cosmos_hashes(block_number)
-                       |> Enum.map(fn tx -> Chain.Hash.to_string(tx) end)
-
-    case tx_hashes_string do
-      [_|_] ->
-        list_mapping = get_cosmos_hash_tx_list_mapping(block_number)
-
-        params = for %{hash: hash, cosmos_hash: cosmos_hash} when is_nil(hash) == false <- list_mapping do
-          if Enum.member?(tx_hashes_string, hash) do
-            %{hash: hash, cosmos_hash: cosmos_hash}
-          else
-            nil
-          end
-        end |> Enum.filter(fn elem -> is_nil(elem) == false end)
-    
-        list_params = for %{hash: hash, cosmos_hash: cosmos_hash} <- params do
-          {:ok, tx_hash} = Chain.string_to_transaction_hash(hash)
-          %{hash: tx_hash, cosmos_hash: cosmos_hash}
-        end
-        Chain.update_transactions_cosmos_hashes_by_batch(list_params)
-      _ ->
-        {:ok}
-    end
-  end
-
-  @spec base_api_url :: String.t()
-  defp base_api_url() do
-    System.get_env("API_NODE_URL")
-  end
-
-  @spec block_info_url :: String.t()
-  defp block_info_url() do
-    base_api_url() <> "/cosmos/base/tendermint/v1beta1/blocks/"
-  end
 end
