@@ -1,9 +1,9 @@
 import $ from 'jquery'
 import AutoComplete from '@tarekraafat/autocomplete.js/dist/autoComplete'
+import { astraToEth } from '@astradefi/address-converter'
 import { getTextAdData, fetchTextAdData } from './ad'
 import { DateTime } from 'luxon'
 import { appendTokenIcon } from './token_icon'
-import { escapeHtml } from './utils'
 import xss from 'xss'
 
 const placeHolder = 'Search by address, token symbol, name, transaction hash, or block number'
@@ -46,33 +46,28 @@ const resultsListElement = (list, data) => {
 
   fetchTextAdData()
 }
-export const searchEngine = (query, record) => {
-  const queryLowerCase = query.toLowerCase()
+const searchEngine = (query, record) => {
   if (record && (
     (record.name && record.name.toLowerCase().includes(query.toLowerCase())) ||
       (record.symbol && record.symbol.toLowerCase().includes(query.toLowerCase())) ||
       (record.address_hash && record.address_hash.toLowerCase().includes(query.toLowerCase())) ||
-      (record.cosmos_hash && record.cosmos_hash.toLowerCase().includes(query.toLowerCase())) ||
       (record.tx_hash && record.tx_hash.toLowerCase().includes(query.toLowerCase())) ||
+      (record.cosmos_hash && record.cosmos_hash.toLowerCase().includes(query.toLowerCase())) ||
       (record.block_hash && record.block_hash.toLowerCase().includes(query.toLowerCase()))
   )
   ) {
-    let searchResult = '<div>'
-    searchResult += `<div>${record.address_hash || record.tx_hash || record.block_hash}</div>`
-
-    if (record.type === 'transaction_cosmos') {
-      searchResult = `<div>${record.cosmos_hash}</div>`
-    }
+    var searchResult = '<div>'
+    searchResult += `<div>${record.address_hash || record.tx_hash || record.cosmos_hash || record.block_hash}</div>`
 
     if (record.type === 'label') {
       searchResult += `<div class="fontawesome-icon tag"></div><span> <b>${record.name}</b></span>`
     } else {
       searchResult += '<div>'
       if (record.name) {
-        searchResult += `<b>${escapeHtml(record.name)}</b>`
+        searchResult += `<b>${record.name}</b>`
       }
       if (record.symbol) {
-        searchResult += ` (${escapeHtml(record.symbol)})`
+        searchResult += ` (${record.symbol})`
       }
       if (record.holder_count) {
         searchResult += ` <i>${record.holder_count} holder(s)</i>`
@@ -83,7 +78,7 @@ export const searchEngine = (query, record) => {
       searchResult += '</div>'
     }
     searchResult += '</div>'
-    const re = new RegExp(query, 'ig')
+    var re = new RegExp(query, 'ig')
     searchResult = searchResult.replace(re, '<mark class=\'autoComplete_highlight\'>$&</mark>')
     return searchResult
   }
@@ -104,7 +99,7 @@ const resultItemElement = async (item, data) => {
   const $searchInput = $('#main-search-autocomplete')
   const chainID = $searchInput.data('chain-id')
   const displayTokenIcons = $searchInput.data('display-token-icons')
-  appendTokenIcon($tokenIconContainer, chainID, data.value.address_hash, displayTokenIcons, 15)
+  appendTokenIcon($tokenIconContainer, chainID, data.value.address_hash, data.value.foreign_chain_id, data.value.foreign_token_hash, displayTokenIcons, 15)
 }
 const config = (id) => {
   return {
@@ -113,7 +108,7 @@ const config = (id) => {
       src: (query) => dataSrc(query, id),
       cache: false
     },
-    placeHolder,
+    placeHolder: placeHolder,
     searchEngine: (query, record) => searchEngine(query, record),
     threshold: 2,
     resultsList: {
@@ -128,7 +123,10 @@ const config = (id) => {
     },
     query: (input) => {
       // Auto convert astra address to ether address
-      let inputModified = input
+      let inputModified = input;
+      if (inputModified.startsWith('astra')){
+        inputModified = astraToEth(input)
+      }
       return xss(inputModified)
     },
     events: {
@@ -140,9 +138,9 @@ const config = (id) => {
     }
   }
 }
-const autoCompleteJS = document.querySelector('#main-search-autocomplete') && new AutoComplete(config('main-search-autocomplete'))
+const autoCompleteJS = new AutoComplete(config('main-search-autocomplete'))
 // eslint-disable-next-line
-const autoCompleteJSMobile = document.querySelector('#main-search-autocomplete-mobile') && new AutoComplete(config('main-search-autocomplete-mobile'))
+const autoCompleteJSMobile = new AutoComplete(config('main-search-autocomplete-mobile'))
 
 const selection = (event) => {
   const selectionValue = event.detail.selection.value
@@ -153,12 +151,17 @@ const selection = (event) => {
     window.location = `/tokens/${selectionValue.address_hash}`
   } else if (selectionValue.type === 'transaction') {
     window.location = `/tx/${selectionValue.tx_hash}`
-  } else if (selectionValue.type === 'transaction_cosmos') {
-    window.location = `/tx/${selectionValue.cosmos_hash}`
   } else if (selectionValue.type === 'block') {
     window.location = `/blocks/${selectionValue.block_hash}`
   }
 }
+
+document.querySelector('#main-search-autocomplete').addEventListener('selection', function (event) {
+  selection(event)
+})
+document.querySelector('#main-search-autocomplete-mobile').addEventListener('selection', function (event) {
+  selection(event)
+})
 
 const openOnFocus = (event, type) => {
   const query = event.target.value
@@ -182,17 +185,10 @@ const openOnFocus = (event, type) => {
   }
 }
 
-document.querySelector('#main-search-autocomplete') && document.querySelector('#main-search-autocomplete').addEventListener('selection', function (event) {
-  selection(event)
-})
-document.querySelector('#main-search-autocomplete-mobile') && document.querySelector('#main-search-autocomplete-mobile').addEventListener('selection', function (event) {
-  selection(event)
-})
-
-document.querySelector('#main-search-autocomplete') && document.querySelector('#main-search-autocomplete').addEventListener('focus', function (event) {
+document.querySelector('#main-search-autocomplete').addEventListener('focus', function (event) {
   openOnFocus(event, 'desktop')
 })
 
-document.querySelector('#main-search-autocomplete-mobile') && document.querySelector('#main-search-autocomplete-mobile').addEventListener('focus', function (event) {
+document.querySelector('#main-search-autocomplete-mobile').addEventListener('focus', function (event) {
   openOnFocus(event, 'mobile')
 })
