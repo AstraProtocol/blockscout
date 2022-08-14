@@ -6,66 +6,6 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
 
   import Mox
 
-  def prepare_contracts do
-    insert(:contract_address)
-    {:ok, dt_1, _} = DateTime.from_iso8601("2022-09-20 10:00:00Z")
-
-    contract_1 =
-      insert(:smart_contract,
-        contract_code_md5: "123",
-        name: "Test 1",
-        optimization: "1",
-        compiler_version: "v0.6.8+commit.0bbfe453",
-        abi: [%{foo: "bar"}],
-        inserted_at: dt_1
-      )
-
-    insert(:contract_address)
-    {:ok, dt_2, _} = DateTime.from_iso8601("2022-09-22 10:00:00Z")
-
-    contract_2 =
-      insert(:smart_contract,
-        contract_code_md5: "12345",
-        name: "Test 2",
-        optimization: "0",
-        compiler_version: "v0.7.5+commit.eb77ed08",
-        abi: [%{foo: "bar-2"}],
-        inserted_at: dt_2
-      )
-
-    insert(:contract_address)
-    {:ok, dt_3, _} = DateTime.from_iso8601("2022-09-24 10:00:00Z")
-
-    contract_3 =
-      insert(:smart_contract,
-        contract_code_md5: "1234567",
-        name: "Test 3",
-        optimization: "1",
-        compiler_version: "v0.4.26+commit.4563c3fc",
-        abi: [%{foo: "bar-3"}],
-        inserted_at: dt_3
-      )
-
-    [contract_1, contract_2, contract_3]
-  end
-
-  def result(contract) do
-    %{
-      "ABI" => Jason.encode!(contract.abi),
-      "Address" => to_string(contract.address_hash),
-      "CompilerVersion" => contract.compiler_version,
-      "ContractName" => contract.name,
-      "OptimizationUsed" => if(contract.optimization, do: "1", else: "0")
-    }
-  end
-
-  defp result_not_verified(address_hash) do
-    %{
-      "ABI" => "Contract source code not verified",
-      "Address" => to_string(address_hash)
-    }
-  end
-
   describe "listcontracts" do
     setup do
       %{params: %{"module" => "contract", "action" => "listcontracts"}}
@@ -107,7 +47,15 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result(contract)]
+      assert response["result"] == [
+               %{
+                 "ABI" => Jason.encode!(contract.abi),
+                 "Address" => to_string(contract.address_hash),
+                 "CompilerVersion" => contract.compiler_version,
+                 "ContractName" => contract.name,
+                 "OptimizationUsed" => if(contract.optimization, do: "1", else: "0")
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -123,7 +71,12 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result_not_verified(address.hash)]
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(address.hash)
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -140,7 +93,12 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result_not_verified(address.hash)]
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(address.hash)
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -161,7 +119,12 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result_not_verified(address.hash)]
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(address.hash)
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -178,82 +141,15 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result(contract)]
-
-      assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
-    end
-
-    test "filtering for only verified contracts in the date range shows only verified contracts in that range", %{
-      params: params,
-      conn: conn
-    } do
-      [contract_1, contract_2, contract_3] = prepare_contracts()
-
-      filter_params =
-        params
-        |> Map.put("filter", "verified")
-        |> Map.put("verified_at_start_timestamp", "1663749418")
-        |> Map.put("verified_at_end_timestamp", "1663922218")
-
-      response =
-        conn
-        |> get("/api", filter_params)
-        |> json_response(200)
-
-      assert response["message"] == "OK"
-      assert response["status"] == "1"
-
-      assert response["result"] == [result(contract_2)]
-
-      assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
-    end
-
-    test "filtering for only verified contracts with start created_at timestamp >= given timestamp shows only verified contracts in that range",
-         %{
-           params: params,
-           conn: conn
-         } do
-      [contract_1, contract_2, contract_3] = prepare_contracts()
-
-      filter_params =
-        params
-        |> Map.put("filter", "verified")
-        |> Map.put("verified_at_start_timestamp", "1663749418")
-
-      response =
-        conn
-        |> get("/api", filter_params)
-        |> json_response(200)
-
-      assert response["message"] == "OK"
-      assert response["status"] == "1"
-
-      assert response["result"] == [result(contract_2), result(contract_3)]
-
-      assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
-    end
-
-    test "filtering for only verified contracts with end created_at timestamp < given timestamp shows only verified contracts in that range",
-         %{
-           params: params,
-           conn: conn
-         } do
-      [contract_1, contract_2, contract_3] = prepare_contracts()
-
-      filter_params =
-        params
-        |> Map.put("filter", "verified")
-        |> Map.put("verified_at_end_timestamp", "1663922218")
-
-      response =
-        conn
-        |> get("/api", filter_params)
-        |> json_response(200)
-
-      assert response["message"] == "OK"
-      assert response["status"] == "1"
-
-      assert response["result"] == [result(contract_1), result(contract_2)]
+      assert response["result"] == [
+               %{
+                 "ABI" => Jason.encode!(contract.abi),
+                 "Address" => to_string(contract.address_hash),
+                 "CompilerVersion" => contract.compiler_version,
+                 "ContractName" => contract.name,
+                 "OptimizationUsed" => if(contract.optimization, do: "1", else: "0")
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -270,7 +166,12 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result_not_verified(decompiled_smart_contract.address_hash)]
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(decompiled_smart_contract.address_hash)
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -287,7 +188,12 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result_not_verified(smart_contract.address_hash)]
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(smart_contract.address_hash)
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -306,7 +212,10 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert result_not_verified(smart_contract.address_hash) in response["result"]
+      assert %{
+               "ABI" => "Contract source code not verified",
+               "Address" => to_string(smart_contract.address_hash)
+             } in response["result"]
 
       refute to_string(non_match.address_hash) in Enum.map(response["result"], &Map.get(&1, "Address"))
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
@@ -325,7 +234,12 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result_not_verified(contract_address.hash)]
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(contract_address.hash)
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -347,7 +261,12 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
       assert response["message"] == "OK"
       assert response["status"] == "1"
 
-      assert response["result"] == [result_not_verified(contract_address.hash)]
+      assert response["result"] == [
+               %{
+                 "ABI" => "Contract source code not verified",
+                 "Address" => to_string(contract_address.hash)
+               }
+             ]
 
       assert :ok = ExJsonSchema.Validator.validate(listcontracts_schema(), response)
     end
@@ -477,7 +396,20 @@ defmodule BlockScoutWeb.API.RPC.ContractControllerTest do
 
       expected_result = [
         %{
-          "Address" => "0x8bf38d4764929064f2d4d3a56520a76ab3df415b"
+          "Address" => "",
+          "SourceCode" => "",
+          "ABI" => "Contract source code not verified",
+          "ContractName" => "",
+          "CompilerVersion" => "",
+          "OptimizationUsed" => "",
+          "DecompiledSourceCode" => "",
+          "DecompilerVersion" => "",
+          "ConstructorArguments" => "",
+          "EVMVersion" => "",
+          "ExternalLibraries" => "",
+          "OptimizationRuns" => "",
+          "FileName" => "",
+          "IsProxy" => "false"
         }
       ]
 

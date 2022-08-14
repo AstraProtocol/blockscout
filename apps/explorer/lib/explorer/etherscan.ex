@@ -21,8 +21,6 @@ defmodule Explorer.Etherscan do
     end_timestamp: nil
   }
 
-  @burn_address_hash_str "0x0000000000000000000000000000000000000000"
-
   @doc """
   Returns the maximum allowed page size number.
 
@@ -80,7 +78,6 @@ defmodule Explorer.Etherscan do
     created_contract_address_hash
     input
     type
-    call_type
     gas
     gas_used
     error
@@ -202,14 +199,6 @@ defmodule Explorer.Etherscan do
       query_to_address_hash_wrapped
       |> union(^query_from_address_hash_wrapped)
       |> union(^query_created_contract_address_hash_wrapped)
-      |> Chain.wrapped_union_subquery()
-      |> order_by(
-        [q],
-        [
-          {^options.order_by_direction, q.block_number},
-          desc: q.index
-        ]
-      )
       |> Repo.replica().all()
     else
       query =

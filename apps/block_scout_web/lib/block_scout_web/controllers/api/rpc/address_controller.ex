@@ -1,11 +1,8 @@
 defmodule BlockScoutWeb.API.RPC.AddressController do
   use BlockScoutWeb, :controller
 
-  import BlockScoutWeb.AddressController, only: [async_address_counters: 1]
-  import BlockScoutWeb.Chain, only: [get_next_page_number: 1, next_page_path: 1]
-
   alias BlockScoutWeb.API.RPC.Helpers
-  alias Explorer.{Chain, Market, Etherscan, PagingOptions}
+  alias Explorer.{Chain, Etherscan}
   alias Explorer.Chain.{Address, Wei}
   alias Explorer.Etherscan.{Addresses, Blocks}
   alias Indexer.Fetcher.CoinBalanceOnDemand
@@ -22,20 +19,6 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     conn
     |> put_status(200)
     |> render(:listaccounts, %{accounts: accounts})
-  end
-
-  def getaddress(conn, params) do
-    with {:address_param, {:ok, address_param}} <- fetch_address(params),
-         {:format, {:ok, address_hash}} <- to_address_hash(address_param) do
-      {:ok, address} = Chain.hash_to_address(address_hash)
-      render(conn, "getaddress.json", %{address_detail: address})
-    else
-      {:address_param, :error} ->
-        render(conn, :error, error: "Query parameter 'address' is required")
-
-      {:format, :error} ->
-        render(conn, :error, error: "Invalid address format")
-    end
   end
 
   def eth_get_balance(conn, params) do
@@ -113,59 +96,13 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
   end
 
   def txlist(conn, params) do
-    pagination_options = Helpers.put_pagination_options(%{}, params)
+    options = optional_params(params)
 
     with {:address_param, {:ok, address_param}} <- fetch_address(params),
          {:format, {:ok, address_hash}} <- to_address_hash(address_param),
-         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)} do
-
-      options_with_defaults =
-        pagination_options
-        |> Map.put_new(:page_number, 0)
-        |> Map.put_new(:page_size, 10)
-
-      options = %PagingOptions{
-        key: nil,
-        page_number: options_with_defaults.page_number,
-        page_size: options_with_defaults.page_size + 1
-      }
-
-      full_options =
-        [
-          necessity_by_association: %{
-            [created_contract_address: :names] => :optional,
-            [from_address: :names] => :optional,
-            [to_address: :names] => :optional,
-            :block => :optional,
-            [created_contract_address: :smart_contract] => :optional,
-            [from_address: :smart_contract] => :optional,
-            [to_address: :smart_contract] => :optional
-          }
-        ] |> Keyword.merge(paging_options_token_transfer_list(params, options))
-
-      transactions_plus_one = Chain.address_to_transactions_with_rewards(address_hash, full_options)
-      {transactions, next_page} = split_list_by_page(transactions_plus_one, options_with_defaults.page_size)
-
-      if length(next_page) > 0 do
-        last_transaction = Enum.at(transactions, -1)
-        next_page_params = %{
-          "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
-          "block_number" => last_transaction.block_number,
-          "index" => last_transaction.index
-        }
-        render(conn, "txlist.json", %{
-          transactions: transactions,
-          has_next_page: true,
-          next_page_path: next_page_path(next_page_params)}
-        )
-      else
-        render(conn, "txlist.json", %{
-          transactions: transactions,
-          has_next_page: false,
-          next_page_path: ""}
-        )
-      end
+         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)},
+         {:ok, transactions} <- list_transactions(address_hash, options) do
+      render(conn, :txlist, %{transactions: transactions})
     else
       {:address_param, :error} ->
         conn
@@ -176,6 +113,9 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         conn
         |> put_status(200)
         |> render(:error, error: "Invalid address format")
+
+      {_, :not_found} ->
+        render(conn, :error, error: "No transactions found", data: [])
     end
   end
 
@@ -206,189 +146,18 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
   end
 
   def txlistinternal(conn, params, address_param, :address) do
-    pagination_options = Helpers.put_pagination_options(%{}, params)
+    options = optional_params(params)
 
     with {:format, {:ok, address_hash}} <- to_address_hash(address_param),
-         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)} do
-
-      options_with_defaults =
-        pagination_options
-        |> Map.put_new(:page_number, 0)
-        |> Map.put_new(:page_size, 10)
-
-      options = %PagingOptions{
-        key: nil,
-        page_number: options_with_defaults.page_number,
-        page_size: options_with_defaults.page_size + 1
-      }
-
-      full_options =
-        [
-          necessity_by_association: %{
-            [created_contract_address: :names] => :optional,
-            [from_address: :names] => :optional,
-            [to_address: :names] => :optional,
-            [created_contract_address: :smart_contract] => :optional,
-            [from_address: :smart_contract] => :optional,
-            [to_address: :smart_contract] => :optional
-          }
-        ] |> Keyword.merge(paging_options_list_internal_transactions(params, options))
-
-      internal_transactions_plus_one = Chain.address_to_internal_transactions(address_hash, full_options)
-      {internal_transactions, next_page} =
-        split_list_by_page(internal_transactions_plus_one, options_with_defaults.page_size)
-
-      if length(next_page) > 0 do
-        last_internal_transaction = Enum.at(internal_transactions, -1)
-        next_page_params = %{
-          "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
-          "block_number" => last_internal_transaction.block_number,
-          "transaction_index" => last_internal_transaction.transaction_index,
-          "index" => last_internal_transaction.index
-        }
-
-        render(conn, "txlistinternalbyaddress.json", %{
-          internal_transactions: internal_transactions,
-          has_next_page: true,
-          next_page_path: next_page_path(next_page_params)}
-        )
-      else
-        render(conn, "txlistinternalbyaddress.json", %{
-          internal_transactions: internal_transactions,
-          has_next_page: false,
-          next_page_path: ""}
-        )
-      end
+         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)},
+         {:ok, internal_transactions} <- list_internal_transactions(address_hash, options) do
+      render(conn, :txlistinternal, %{internal_transactions: internal_transactions})
     else
       {:format, :error} ->
         render(conn, :error, error: "Invalid address format")
 
       {_, :not_found} ->
-        render(conn, :error, error: "Address not found", data: [])
-    end
-  end
-
-  def getlisttokentransfers(conn, params) do
-    pagination_options = Helpers.put_pagination_options(%{}, params)
-
-    with {:address_param, {:ok, address_param}} <- fetch_address(params),
-         {:format, {:ok, address_hash}} <- to_address_hash(address_param),
-         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)} do
-
-      options_with_defaults =
-        pagination_options
-        |> Map.put_new(:page_number, 0)
-        |> Map.put_new(:page_size, 10)
-
-      options = %PagingOptions{
-        key: nil,
-        page_number: options_with_defaults.page_number,
-        page_size: options_with_defaults.page_size + 1
-      }
-
-      full_options =
-        [
-          necessity_by_association: %{
-            [created_contract_address: :names] => :optional,
-            [token_transfers: :token] => :optional,
-            [token_transfers: :to_address] => :optional,
-            [token_transfers: :from_address] => :optional,
-            [token_transfers: :token_contract_address] => :optional,
-            :block => :required
-          }
-        ] |> Keyword.merge(paging_options_token_transfer_list(params, options))
-
-      transactions_plus_one =
-        Chain.address_hash_to_token_transfers(
-          address_hash,
-          full_options
-        )
-
-      {transactions, next_page} = split_list_by_page(transactions_plus_one, options_with_defaults.page_size)
-
-      if length(next_page) > 0 do
-        last_transaction = Enum.at(transactions, -1)
-        next_page_params = %{
-          "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
-          "block_number" => last_transaction.block_number,
-          "index" => last_transaction.index
-        }
-
-        render(conn, "getlisttokentransfers.json", %{
-          token_transfers: transactions,
-          has_next_page: true,
-          next_page_path: next_page_path(next_page_params)}
-        )
-      else
-        render(conn, "getlisttokentransfers.json", %{
-          token_transfers: transactions,
-          has_next_page: false,
-          next_page_path: ""}
-        )
-      end
-    else
-      {:address_param, :error} ->
-        render(conn, :error, error: "Query parameter address is required")
-
-      {:format, :error} ->
-        render(conn, :error, error: "Invalid address format")
-
-      {_, :not_found} ->
-        render(conn, :error, error: "Address not found")
-    end
-  end
-
-  def getlogs(conn, params) do
-    pagination_options = Helpers.put_pagination_options(%{}, params)
-    with {:address_param, {:ok, address_param}} <- fetch_address(params),
-         {:format, {:ok, address_hash}} <- to_address_hash(address_param) do
-
-      options_with_defaults =
-        pagination_options
-        |> Map.put_new(:page_number, 0)
-        |> Map.put_new(:page_size, 10)
-
-      options = %PagingOptions{
-        key: nil,
-        page_number: options_with_defaults.page_number,
-        page_size: options_with_defaults.page_size + 1
-      }
-
-      logs_plus_one = Chain.address_to_logs(address_hash, paging_options_list_internal_transactions(params, options))
-
-      {logs, next_page} = split_list_by_page(logs_plus_one, options_with_defaults.page_size)
-
-      if length(next_page) > 0 do
-        last_log = Enum.at(logs, -1)
-        next_page_params = %{
-          "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
-          "block_number" => last_log.transaction.block_number,
-          "transaction_index" => last_log.transaction.index,
-          "index" => last_log.index
-        }
-
-        render(conn, "getlogs.json", %{
-          logs: logs,
-          has_next_page: true,
-          next_page_path: next_page_path(next_page_params)}
-        )
-      else
-        render(conn, "getlogs.json", %{
-          logs: logs,
-          has_next_page: false,
-          next_page_path: ""}
-        )
-      end
-
-    else
-      {:address_param, :error} ->
-        render(conn, :error, error: "Query parameter address is required")
-
-      {:format, :error} ->
-        render(conn, :error, error: "Invalid address format")
+        render(conn, :error, error: "No internal transactions found", data: [])
     end
   end
 
@@ -434,51 +203,11 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
   end
 
   def tokenlist(conn, params) do
-    pagination_options = Helpers.put_pagination_options(%{}, params)
-
     with {:address_param, {:ok, address_param}} <- fetch_address(params),
          {:format, {:ok, address_hash}} <- to_address_hash(address_param),
-         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)} do
-
-      options_with_defaults =
-        pagination_options
-        |> Map.put_new(:page_number, 0)
-        |> Map.put_new(:page_size, 10)
-
-      options = %PagingOptions{
-        key: nil,
-        page_number: options_with_defaults.page_number,
-        page_size: options_with_defaults.page_size + 1
-      }
-
-      token_balances_plus_one =
-        address_hash
-        |> Chain.fetch_last_token_balances(paging_options_token_list(params, options))
-        |> Market.add_price()
-
-      {token_balances, next_page} = split_list_by_page(token_balances_plus_one, options_with_defaults.page_size)
-
-      if length(next_page) > 0 do
-        {%Address.CurrentTokenBalance{value: value, token: token}, _} = Enum.at(token_balances, -1)
-        next_page_params = %{
-          "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
-          "token_name" => token.name,
-          "token_type" => token.type,
-          "value" => to_string(value)
-        }
-        render(conn, :token_list, %{
-          token_list: token_balances,
-          has_next_page: true,
-          next_page_path: next_page_path(next_page_params)}
-        )
-      else
-        render(conn, :token_list, %{
-          token_list: token_balances,
-          has_next_page: false,
-          next_page_path: ""}
-        )
-      end
+         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)},
+         {:ok, token_list} <- list_tokens(address_hash) do
+      render(conn, :token_list, %{token_list: token_list})
     else
       {:address_param, :error} ->
         render(conn, :error, error: "Query parameter address is required")
@@ -511,142 +240,6 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     end
   end
 
-  def gettopaddressesbalance(conn, params) do
-    with pagination_options <- Helpers.put_pagination_options(%{}, params) do
-      options_with_defaults =
-        pagination_options
-        |> Map.put_new(:page_number, 0)
-        |> Map.put_new(:page_size, 10)
-
-      options = %PagingOptions{
-        key: nil,
-        page_number: options_with_defaults.page_number,
-        page_size: options_with_defaults.page_size + 1
-      }
-
-      addresses_plus_one =
-        params
-        |> paging_options_top_addresses_balance(options)
-        |> Chain.list_top_addresses()
-
-      {addresses, next_page} = split_list_by_page(addresses_plus_one, options_with_defaults.page_size)
-
-      items = for {address, tx_count} <- addresses do
-        %{
-          address: address,
-          tx_count: tx_count
-        }
-      end
-
-      if length(next_page) > 0 do
-        {%Address{hash: hash, fetched_coin_balance: fetched_coin_balance}, _} = Enum.at(addresses, -1)
-        next_page_params = %{
-          "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
-          "hash" => hash,
-          "fetched_coin_balance" => Decimal.to_string(fetched_coin_balance.value)
-        }
-        render(conn, "gettopaddressesbalance.json", %{
-          top_addresses_balance: items,
-          has_next_page: true,
-          next_page_path: next_page_path(next_page_params)}
-        )
-      else
-        render(conn, "gettopaddressesbalance.json", %{
-          top_addresses_balance: items,
-          has_next_page: false,
-          next_page_path: ""}
-        )
-      end
-    end
-  end
-
-  def getcoinbalancehistory(conn, params) do
-    pagination_options = Helpers.put_pagination_options(%{}, params)
-
-    with {:address_param, {:ok, address_param}} <- fetch_address(params),
-         {:format, {:ok, address_hash}} <- to_address_hash(address_param),
-         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)} do
-
-      options_with_defaults =
-        pagination_options
-        |> Map.put_new(:page_number, 0)
-        |> Map.put_new(:page_size, 10)
-
-      options = %PagingOptions{
-        key: nil,
-        page_number: options_with_defaults.page_number,
-        page_size: options_with_defaults.page_size + 1
-      }
-
-      full_options = paging_options_coin_balance_history(params, options)
-
-      coin_balances_plus_one = Chain.address_to_coin_balances(address_hash, full_options)
-
-      {coin_balances, next_page} = split_list_by_page(coin_balances_plus_one, options_with_defaults.page_size)
-
-      if length(next_page) > 0 do
-        coin_balance = Enum.at(coin_balances, -1)
-        next_page_params = %{
-          "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
-          "block_number" => coin_balance.block_number
-        }
-        render(conn, "getcoinbalancehistory.json", %{
-          coin_balances: coin_balances,
-          has_next_page: true,
-          next_page_path: next_page_path(next_page_params)}
-        )
-      else
-        render(conn, "getcoinbalancehistory.json", %{
-          coin_balances: coin_balances,
-          has_next_page: false,
-          next_page_path: ""}
-        )
-      end
-    else
-      {:address_param, :error} ->
-        render(conn, :error, error: "Query parameter 'address' is required")
-
-      {:format, :error} ->
-        render(conn, :error, error: "Invalid address format")
-    end
-  end
-
-  def getaddresscounters(conn, params) do
-    with {:address_param, {:ok, address_param}} <- fetch_address(params),
-         {:format, {:ok, address_hash}} <- to_address_hash(address_param),
-         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)},
-         {:ok, address} <- Chain.hash_to_address(address_hash) do
-
-      {validation_count} = async_address_counters(address)
-      transactions_from_db = address.transactions_count || 0
-      token_transfers_from_db = address.token_transfers_count || 0
-      address_gas_usage_from_db = address.gas_used || 0
-
-      render(conn, "getaddresscounters.json", %{
-        transaction_count: transactions_from_db,
-        token_transfer_count: token_transfers_from_db,
-        gas_usage_count: address_gas_usage_from_db,
-        validation_count: validation_count
-      })
-    else
-      {:address_param, :error} ->
-        render(conn, :error, error: "Query parameter 'address' is required")
-
-      {:format, :error} ->
-        render(conn, :error, error: "Invalid address format")
-
-      _ ->
-        render(conn, "getaddresscounters.json", %{
-          transaction_count: 0,
-          token_transfer_count: 0,
-          gas_usage_count: 0,
-          validation_count: 0
-        })
-    end
- end
-
   @doc """
   Sanitizes optional params.
 
@@ -656,11 +249,11 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     %{}
     |> put_order_by_direction(params)
     |> Helpers.put_pagination_options(params)
-    |> put_block(params, "start_block")
-    |> put_block(params, "end_block")
+    |> put_start_block(params)
+    |> put_end_block(params)
     |> put_filter_by(params)
-    |> put_timestamp(params, "start_timestamp")
-    |> put_timestamp(params, "end_timestamp")
+    |> put_start_timestamp(params)
+    |> put_end_timestamp(params)
   end
 
   @doc """
@@ -681,59 +274,6 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
 
     {:required_params, result}
   end
-
-  defp paging_options_top_addresses_balance(params, paging_options) do
-    if !is_nil(params["fetched_coin_balance"]) and !is_nil(params["hash"]) do
-      {coin_balance, ""} = Integer.parse(params["fetched_coin_balance"])
-      {:ok, address_hash} = Chain.string_to_address_hash(params["hash"])
-      [paging_options: %{paging_options | key: {%Wei{value: Decimal.new(coin_balance)}, address_hash}}]
-    else
-      [paging_options: paging_options]
-    end
-  end
-
-  defp paging_options_coin_balance_history(params, paging_options) do
-    if !is_nil(params["block_number"]) do
-      case Integer.parse(params["block_number"]) do
-        {block_number, ""} ->
-          [paging_options: %{paging_options | key: {block_number}}]
-        _ ->
-          [paging_options: paging_options]
-      end
-    else
-      [paging_options: paging_options]
-    end
-  end
-
-  defp paging_options_list_internal_transactions(params, paging_options) do
-    if !is_nil(params["block_number"]) and !is_nil(params["transaction_index"]) and !is_nil(params["index"]) do
-      {block_number, ""} = Integer.parse(params["block_number"])
-      {transaction_index, ""} = Integer.parse(params["transaction_index"])
-      {index, ""} = Integer.parse(params["index"])
-
-      [paging_options: %{paging_options | key: {block_number, transaction_index, index}}]
-    else
-      [paging_options: paging_options]
-    end
-  end
-
-  defp paging_options_token_list(params, paging_options) do
-    if !is_nil(params["token_name"]) and !is_nil(params["token_type"]) and !is_nil(params["value"]) do
-      [paging_options: %{paging_options | key: {params["token_name"], params["token_type"], params["value"]}}]
-    else
-      [paging_options: paging_options]
-    end
-  end
-
-  defp paging_options_token_transfer_list(params, paging_options) do
-    if !is_nil(params["block_number"]) and !is_nil(params["index"]) do
-      [paging_options: %{paging_options | key: {params["block_number"], params["index"]}}]
-    else
-      [paging_options: paging_options]
-    end
-  end
-
-  defp split_list_by_page(list_plus_one, page_size), do: Enum.split(list_plus_one, page_size)
 
   defp fetch_block_param(%{"block" => "latest"}), do: {:ok, :latest}
   defp fetch_block_param(%{"block" => "earliest"}), do: {:ok, :earliest}
@@ -887,42 +427,62 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     end
   end
 
-  # sobelow_skip ["DOS.StringToAtom"]
-  defp put_block(options, params, key) do
-    with %{^key => block_param} <- params,
-         {block_number, ""} <- Integer.parse(block_param) do
-      Map.put(options, String.to_atom(key), block_number)
+  defp put_start_block(options, params) do
+    with %{"startblock" => startblock_param} <- params,
+         {start_block, ""} <- Integer.parse(startblock_param) do
+      Map.put(options, :start_block, start_block)
     else
       _ ->
         options
     end
   end
 
-  # sobelow_skip ["DOS.StringToAtom"]
+  defp put_end_block(options, params) do
+    with %{"endblock" => endblock_param} <- params,
+         {end_block, ""} <- Integer.parse(endblock_param) do
+      Map.put(options, :end_block, end_block)
+    else
+      _ ->
+        options
+    end
+  end
+
   defp put_filter_by(options, params) do
     case params do
-      %{"filter_by" => filter_by} when filter_by in ["from", "to"] ->
-        Map.put(options, String.to_atom("filter_by"), filter_by)
+      %{"filterby" => filter_by} when filter_by in ["from", "to"] ->
+        Map.put(options, :filter_by, filter_by)
 
       _ ->
         options
     end
   end
 
-  def put_timestamp({:ok, options}, params, timestamp_param_key) do
-    options = put_timestamp(options, params, timestamp_param_key)
-    {:ok, options}
-  end
-
-  # sobelow_skip ["DOS.StringToAtom"]
-  def put_timestamp(options, params, timestamp_param_key) do
-    with %{^timestamp_param_key => timestamp_param} <- params,
-         {unix_timestamp, ""} <- Integer.parse(timestamp_param),
-         {:ok, timestamp} <- DateTime.from_unix(unix_timestamp) do
-      Map.put(options, String.to_atom(timestamp_param_key), timestamp)
+  defp put_start_timestamp(options, params) do
+    with %{"starttimestamp" => starttimestamp_param} <- params,
+         {unix_timestamp, ""} <- Integer.parse(starttimestamp_param),
+         {:ok, start_timestamp} <- DateTime.from_unix(unix_timestamp) do
+      Map.put(options, :start_timestamp, start_timestamp)
     else
       _ ->
         options
+    end
+  end
+
+  defp put_end_timestamp(options, params) do
+    with %{"endtimestamp" => endtimestamp_param} <- params,
+         {unix_timestamp, ""} <- Integer.parse(endtimestamp_param),
+         {:ok, end_timestamp} <- DateTime.from_unix(unix_timestamp) do
+      Map.put(options, :end_timestamp, end_timestamp)
+    else
+      _ ->
+        options
+    end
+  end
+
+  defp list_transactions(address_hash, options) do
+    case Etherscan.list_transactions(address_hash, options) do
+      [] -> {:error, :not_found}
+      transactions -> {:ok, transactions}
     end
   end
 
@@ -934,7 +494,14 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
   end
 
   defp list_internal_transactions(transaction_hash) do
-    case Chain.get_internal_transactions_by_transaction_hash(transaction_hash) do
+    case Etherscan.list_internal_transactions(transaction_hash) do
+      [] -> {:error, :not_found}
+      internal_transactions -> {:ok, internal_transactions}
+    end
+  end
+
+  defp list_internal_transactions(address_hash, options) do
+    case Etherscan.list_internal_transactions(address_hash, options) do
       [] -> {:error, :not_found}
       internal_transactions -> {:ok, internal_transactions}
     end
@@ -958,6 +525,13 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     case Etherscan.get_token_balance(contract_address_hash, address_hash) do
       nil -> 0
       token_balance -> token_balance.value
+    end
+  end
+
+  defp list_tokens(address_hash) do
+    case Etherscan.list_tokens(address_hash) do
+      [] -> {:error, :not_found}
+      token_list -> {:ok, token_list}
     end
   end
 end
