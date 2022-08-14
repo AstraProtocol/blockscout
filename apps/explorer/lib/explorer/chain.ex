@@ -1438,7 +1438,7 @@ defmodule Explorer.Chain do
             address_hash: fragment("CAST(NULL AS bytea)"),
             tx_hash: transaction.hash,
             block_hash: fragment("CAST(NULL AS bytea)"),
-            type: "transaction",
+            type: "transaction_cosmos",
             name: ^nil,
             symbol: ^nil,
             holder_count: ^nil,
