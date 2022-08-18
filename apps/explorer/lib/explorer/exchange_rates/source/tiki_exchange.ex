@@ -45,15 +45,19 @@ defmodule Explorer.ExchangeRates.Source.TikiExchange do
   end
 
   defp get_supply() do
-    url = "https://api.astranaut.dev/cosmos/bank/v1beta1/supply"
-    {:ok, result} = Source.http_request(url, headers())
-    if is_map(result) do
-      list_supply = result["supply"]
-      for %{"amount" => amount, "denom" => denom} when denom == "aastra" <- list_supply do
-        String.slice(amount, 0..-19)
-      end
-    else
-      [0]
+    url = base_api_url() <> "/cosmos/bank/v1beta1/supply"
+    case Source.http_request(url, headers()) do
+      {:error, reason} ->
+        Logger.error("failed to get supply: ", inspect(reason))
+      {:ok, result} ->
+        if is_map(result) do
+          list_supply = result["supply"]
+          for %{"amount" => amount, "denom" => denom} when denom == "aastra" <- list_supply do
+            String.slice(amount, 0..-19)
+          end
+        else
+          [0]
+        end
     end
   end
 
@@ -110,6 +114,11 @@ defmodule Explorer.ExchangeRates.Source.TikiExchange do
 
         if id, do: "#{coin_gecko_url()}/coins/#{id}", else: nil
     end
+  end
+
+  @spec base_api_url :: String.t()
+  defp base_api_url() do
+    configured_url = System.get_env("API_NODE_URL") || "https://api.astranaut.dev"
   end
 
   defp base_url do
