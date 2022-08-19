@@ -294,6 +294,7 @@ defmodule Indexer.Block.Realtime.Fetcher do
 
     {fetch_duration, result} =
       :timer.tc(fn -> fetch_and_import_range(block_fetcher, block_number_to_fetch..block_number_to_fetch) end)
+      #:timer.tc(fn -> fetch_and_import_range(block_fetcher, 1038260..1038261) end)
 
     case result do
       {:ok, %{inserted: inserted, errors: []}} ->
