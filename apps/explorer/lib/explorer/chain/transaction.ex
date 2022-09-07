@@ -30,7 +30,7 @@ defmodule Explorer.Chain.Transaction do
   alias Explorer.Chain.Transaction.{Fork, Status}
 
   @optional_attrs ~w(max_priority_fee_per_gas max_fee_per_gas block_hash block_number created_contract_address_hash cumulative_gas_used earliest_processing_start
-                     error gas_used index created_contract_code_indexed_at status to_address_hash revert_reason type has_error_in_internal_txs)a
+                     error gas_used index created_contract_code_indexed_at status to_address_hash revert_reason type has_error_in_internal_txs cosmos_hash)a
 
   @required_attrs ~w(from_address_hash gas gas_price hash input nonce r s v value)a
 
@@ -153,6 +153,7 @@ defmodule Explorer.Chain.Transaction do
           gas_price: wei_per_gas,
           gas_used: Gas.t() | nil,
           hash: Hash.t(),
+          cosmos_hash: String.t() | nil,
           index: transaction_index | nil,
           input: Data.t(),
           internal_transactions: %Ecto.Association.NotLoaded{} | [InternalTransaction.t()],
@@ -181,6 +182,7 @@ defmodule Explorer.Chain.Transaction do
              :gas,
              :gas_price,
              :gas_used,
+             :cosmos_hash,
              :index,
              :created_contract_code_indexed_at,
              :input,
@@ -201,6 +203,7 @@ defmodule Explorer.Chain.Transaction do
              :gas,
              :gas_price,
              :gas_used,
+             :cosmos_hash,
              :index,
              :created_contract_code_indexed_at,
              :input,
@@ -222,6 +225,7 @@ defmodule Explorer.Chain.Transaction do
     field(:gas, :decimal)
     field(:gas_price, Wei)
     field(:gas_used, :decimal)
+    field(:cosmos_hash, :string)
     field(:index, :integer)
     field(:created_contract_code_indexed_at, :utc_datetime_usec)
     field(:input, Data)
@@ -422,6 +426,20 @@ defmodule Explorer.Chain.Transaction do
     |> check_status()
     |> foreign_key_constraint(:block_hash)
     |> unique_constraint(:hash)
+  end
+
+  def update_error_in_internal_txs(hash) do
+    case Hash.Full.cast(hash) do
+      {:ok, tx_hash} ->
+        schema = Repo.get_by(Transaction, [hash: tx_hash])
+        if schema != nil and is_nil(schema.has_error_in_internal_txs) do
+          change(schema, %{has_error_in_internal_txs: true}) |> Repo.update()
+        else
+          {:error, nil}
+        end
+      _ ->
+        {:error, nil}
+    end
   end
 
   def preload_token_transfers(query, address_hash) do
