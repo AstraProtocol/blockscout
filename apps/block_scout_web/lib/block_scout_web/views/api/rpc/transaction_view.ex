@@ -6,18 +6,21 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   def render("gettxinfo.json", %{
         transaction: transaction,
         block_height: block_height,
-        logs: logs
+        logs: logs,
+        next_page_params: next_page_params
       }) do
-    data = prepare_transaction(transaction, block_height, logs)
+    data = prepare_transaction(transaction, block_height, logs, next_page_params)
     RPCView.render("show.json", data: data)
   end
 
-  def render("getabibytxhash.json", %{abi: abi}) do
-    RPCView.render("show.json", data: %{"abi" => abi})
-  end
-
-  def render("getrawtracebytxhash.json", %{raw_trace: raw_trace}) do
-    RPCView.render("show.json", data: %{"rawTrace" => raw_trace})
+  def render("gettxcosmosinfo.json", %{
+    transaction: transaction,
+    block_height: block_height,
+    logs: logs,
+    next_page_params: next_page_params
+  }) do
+    data = prepare_transaction(transaction, block_height, logs, next_page_params)
+    RPCView.render("show.json", data: data)
   end
 
   def render("gettxreceiptstatus.json", %{status: status}) do
@@ -62,85 +65,30 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
     }
   end
 
-  defp prepare_transaction(transaction, block_height, logs) do
+  defp prepare_transaction(transaction, block_height, logs, next_page_params) do
     %{
-      "blockHeight" => transaction.block_number,
-      "blockHash" => "#{transaction.block.hash}",
-      "blockTime" => transaction.block.timestamp,
       "hash" => "#{transaction.hash}",
-      "cosmosHash" => "#{transaction.cosmos_hash}",
-      "confirmations" => block_height - transaction.block_number,
+      "timeStamp" => "#{DateTime.to_unix(transaction.block.timestamp)}",
+      "blockNumber" => "#{transaction.block_number}",
+      "confirmations" => "#{block_height - transaction.block_number}",
       "success" => if(transaction.status == :ok, do: true, else: false),
-      "error" => "#{transaction.error}",
       "from" => "#{transaction.from_address_hash}",
       "to" => "#{transaction.to_address_hash}",
-      "value" => transaction.value.value,
+      "value" => "#{transaction.value.value}",
       "input" => "#{transaction.input}",
-      "gasLimit" => transaction.gas,
-      "gasUsed" => transaction.gas_used,
-      "gasPrice" => transaction.gas_price.value,
-      "cumulativeGasUsed" => transaction.cumulative_gas_used,
-      "index" => transaction.index,
-      "createdContractAddressHash" => transaction.created_contract_address_hash,
-      "createdContractCodeIndexedAt" => transaction.created_contract_code_indexed_at,
-      "nonce" => transaction.nonce,
-      "r" => transaction.r,
-      "s" => transaction.s,
-      "v" => transaction.v,
-      "maxPriorityFeePerGas" => parse_gas_value(transaction.max_priority_fee_per_gas),
-      "maxFeePerGas" => parse_gas_value(transaction.max_fee_per_gas),
-      "type" => transaction.type,
-      "tokenTransfers" => Enum.map(transaction.token_transfers, &prepare_token_transfer/1),
+      "gasLimit" => "#{transaction.gas}",
+      "gasUsed" => "#{transaction.gas_used}",
+      "gasPrice" => "#{transaction.gas_price.value}",
       "logs" => Enum.map(logs, &prepare_log/1),
-      "revertReason" => "#{transaction.revert_reason}"
+      "revertReason" => "#{transaction.revert_reason}",
+      "next_page_params" => next_page_params
     }
-  end
-
-  defp parse_gas_value(gas_field) do
-    case gas_field do
-      nil ->
-        nil
-      _ ->
-        gas_field.value
-    end
-  end
-
-  defp prepare_token_transfer(token_transfer) do
-    %{
-      "amount" => "#{token_transfer.amount}",
-      "logIndex" => "#{token_transfer.log_index}",
-      "fromAddress" => "#{token_transfer.from_address}",
-      "fromAddressName" => prepare_address_name(token_transfer.from_address),
-      "toAddress" => "#{token_transfer.to_address}",
-      "toAddressName" => prepare_address_name(token_transfer.to_address),
-      "tokenContractAddress" => "#{token_transfer.token_contract_address}",
-      "tokenName" => "#{token_transfer.token.name}",
-      "tokenSymbol" => "#{token_transfer.token.symbol}",
-      "tokenId" => "#{token_transfer.token_id}",
-      "tokenType" => "#{token_transfer.token.type}",
-      "decimals" => "#{token_transfer.token.decimals}"
-    }
-  end
-
-  defp prepare_address_name(address) do
-    case address do
-      nil ->
-        ""
-      _ ->
-        case address.names do
-          [_|_] ->
-            Enum.at(address.names, 0).name
-          _ ->
-            ""
-        end
-    end
   end
 
   defp prepare_log(log) do
     %{
       "address" => "#{log.address_hash}",
-      "addressName" => "#{prepare_address_name(log.address)}",
-      "topics" => get_topics(log) |> Enum.filter(fn log -> is_nil(log) == false end),
+      "topics" => get_topics(log),
       "data" => "#{log.data}",
       "index" => "#{log.index}"
     }
