@@ -390,7 +390,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       nil ->
         "address"
       _ ->
-        "contract address"
+        "contractaddress"
     end
   end
 end
