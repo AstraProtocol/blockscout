@@ -297,6 +297,58 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     end
   end
 
+  def getlogs(conn, params) do
+    pagination_options = Helpers.put_pagination_options(%{}, params)
+    with {:address_param, {:ok, address_param}} <- fetch_address(params),
+         {:format, {:ok, address_hash}} <- to_address_hash(address_param) do
+
+      options_with_defaults =
+        pagination_options
+        |> Map.put_new(:page_number, 0)
+        |> Map.put_new(:page_size, 10)
+
+      options = %PagingOptions{
+        key: nil,
+        page_number: options_with_defaults.page_number,
+        page_size: options_with_defaults.page_size + 1
+      }
+
+      logs_plus_one = Chain.address_to_logs(address_hash, paging_options_list_internal_transactions(params, options))
+
+      {logs, next_page} = split_list_by_page(logs_plus_one, options_with_defaults.page_size)
+
+      if length(next_page) > 0 do
+        last_log = Enum.at(logs, -1)
+        next_page_params = %{
+          "page" => get_next_page_number(options_with_defaults.page_number),
+          "offset" => options_with_defaults.page_size,
+          "block_number" => last_log.transaction.block_number,
+          "transaction_index" => last_log.transaction.index,
+          "index" => last_log.index
+        }
+
+        render(conn, "getlogs.json", %{
+          logs: logs,
+          has_next_page: true,
+          next_page_path: next_page_path(next_page_params)}
+        )
+      else
+        render(conn, "getlogs.json", %{
+          logs: logs,
+          has_next_page: false,
+          next_page_path: ""}
+        )
+      end
+
+    else
+      {:address_param, :error} ->
+        render(conn, :error, error: "Query parameter address is required")
+
+      {:format, :error} ->
+        render(conn, :error, error: "Invalid address format")
+    end
+  end
+
   def tokentx(conn, params) do
     options = optional_params(params)
 
@@ -610,7 +662,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     end
   end
 
-  def paging_options_list_internal_transactions(params, paging_options) do
+  defp paging_options_list_internal_transactions(params, paging_options) do
     if !is_nil(params["block_number"]) and !is_nil(params["transaction_index"]) and !is_nil(params["index"]) do
       {block_number, ""} = Integer.parse(params["block_number"])
       {transaction_index, ""} = Integer.parse(params["transaction_index"])

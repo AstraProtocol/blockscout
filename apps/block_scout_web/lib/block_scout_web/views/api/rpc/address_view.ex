@@ -96,6 +96,16 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     RPCView.render("show_data.json", data: data)
   end
 
+  def render("getlogs.json", %{
+    logs: logs, has_next_page: has_next_page, next_page_path: next_page_path}) do
+    data = %{
+      "result" => Enum.map(logs, &prepare_log/1),
+      "hasNextPage" => has_next_page,
+      "nextPagePath" => next_page_path
+    }
+    RPCView.render("show_data.json", data: data)
+  end
+
   def render("getminedblocks.json", %{blocks: blocks}) do
     data = Enum.map(blocks, &prepare_block/1)
     RPCView.render("show.json", data: data)
@@ -360,6 +370,18 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
 
   defp balance(address) do
     address.fetched_coin_balance && address.fetched_coin_balance.value && "#{address.fetched_coin_balance.value}"
+  end
+
+  defp prepare_log(log) do
+    %{
+      "transaction" => to_string(log.transaction.hash),
+      "topics" => get_topics(log) |> Enum.filter(fn log -> is_nil(log) == false end),
+      "data" => to_string(log.data)
+    }
+  end
+
+  defp get_topics(log) do
+    [log.first_topic, log.second_topic, log.third_topic, log.fourth_topic]
   end
 
   defp prepare_address_name(address) do
