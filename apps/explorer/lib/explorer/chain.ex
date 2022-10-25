@@ -1405,31 +1405,9 @@ defmodule Explorer.Chain do
     end
   end
 
-  defp search_tx_query(term) do
-    cond do
-      is_eth_tx(term) == true ->
-        case Chain.string_to_transaction_hash(term) do
-          {:ok, tx_hash} ->
-            from(transaction in Transaction,
-              where: transaction.hash == ^tx_hash,
-              select: %{
-                address_hash: fragment("CAST(NULL AS bytea)"),
-                tx_hash: transaction.hash,
-                cosmos_hash: transaction.cosmos_hash,
-                block_hash: fragment("CAST(NULL AS bytea)"),
-                type: "transaction",
-                name: ^nil,
-                symbol: ^nil,
-                holder_count: ^nil,
-                inserted_at: transaction.inserted_at,
-                block_number: 0
-              }
-            )
-
-          _ ->
-            nil
-        end
-      is_cosmos_tx(term) == true ->
+  defp search_tx_cosmos_query(term) do
+    case is_cosmos_tx(term) do
+      true ->
         from(transaction in Transaction,
           where: transaction.cosmos_hash == ^term,
           select: %{
@@ -1445,7 +1423,30 @@ defmodule Explorer.Chain do
             block_number: 0
           }
         )
-      true ->
+      false ->
+        nil
+    end
+  end
+
+  defp search_tx_query(term) do
+    case Chain.string_to_transaction_hash(term) do
+      {:ok, tx_hash} ->
+        from(transaction in Transaction,
+          where: transaction.hash == ^tx_hash,
+          select: %{
+            address_hash: fragment("CAST(NULL AS bytea)"),
+            tx_hash: transaction.hash,
+            cosmos_hash: transaction.cosmos_hash,
+            block_hash: fragment("CAST(NULL AS bytea)"),
+            type: "transaction",
+            name: ^nil,
+            symbol: ^nil,
+            holder_count: ^nil,
+            inserted_at: transaction.inserted_at,
+            block_number: 0
+          }
+        )
+      _ ->
         nil
     end
   end
@@ -1500,6 +1501,7 @@ defmodule Explorer.Chain do
         tokens_query = search_token_query(term)
         contracts_query = search_contract_query(term)
         tx_query = search_tx_query(string)
+        tx_cosmos_query = search_tx_cosmos_query(string)
         address_query = search_address_query(string)
         block_query = search_block_query(string)
 
@@ -1518,6 +1520,11 @@ defmodule Explorer.Chain do
             tx_query ->
               basic_query
               |> union(^tx_query)
+              |> union(^block_query)
+
+            tx_cosmos_query ->
+              basic_query
+              |> union(^tx_cosmos_query)
 
             block_query ->
               basic_query
@@ -1622,33 +1629,32 @@ defmodule Explorer.Chain do
   end
 
   def search_tx(term) do
-    cond do
-      is_eth_tx(term) == true ->
-        case Chain.string_to_transaction_hash(term) do
-          {:ok, tx_hash} ->
-            query =
-              from(transaction in Transaction,
-                where: transaction.hash == ^tx_hash,
-                select: %{
-                  link: transaction.hash,
-                  type: "transaction"
-                }
-              )
-            Repo.all(query)
+    if is_cosmos_tx(term) do
+      query =
+        from(transaction in Transaction,
+          where: transaction.cosmos_hash == ^term,
+          select: %{
+            link: transaction.cosmos_hash,
+            type: "transaction_cosmos"
+          }
+        )
+      Repo.all(query)
+    else
+      case Chain.string_to_transaction_hash(term) do
+        {:ok, tx_hash} ->
+          query =
+            from(transaction in Transaction,
+              where: transaction.hash == ^tx_hash,
+              select: %{
+                link: transaction.hash,
+                type: "transaction"
+              }
+            )
+          Repo.all(query)
 
-          _ ->
-            []
-        end
-      is_cosmos_tx(term) == true ->
-        query =
-          from(transaction in Transaction,
-            where: transaction.cosmos_hash == ^term,
-            select: %{
-              link: transaction.cosmos_hash,
-              type: "transaction_cosmos"
-            }
-          )
-        Repo.all(query)
+        _ ->
+          []
+      end
     end
   end
 
@@ -3503,23 +3509,22 @@ defmodule Explorer.Chain do
       true ->
         Hash.Full.cast(string)
       false ->
-        case is_cosmos_tx(string) do
-          true ->
-            %{ok: string}
-          false ->
-            :error
-        end
+        :error
     end
   end
 
   @spec is_eth_tx(String.t()) :: true | false
   def is_eth_tx(string) do
-    String.starts_with?(string, "0x")
+    if String.starts_with?(string, "0x") do
+      true
+    else
+      false
+    end
   end
 
   @spec is_cosmos_tx(String.t()) :: true | false
   def is_cosmos_tx(string) do
-    if String.length(string) == 64 and String.match?(string, ~r/^[A-Z0-9]/) == true do
+    if String.length(string) == 64 and String.match?(string, ~r/^[A-Z0-9]/) do
       true
     else
       false
