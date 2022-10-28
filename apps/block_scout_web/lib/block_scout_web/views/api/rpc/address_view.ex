@@ -408,7 +408,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
   end
 
   defp get_address_type(address) do
-    case address.token do
+    case address.contracts_creation_transaction do
       nil ->
         "address"
       _ ->
