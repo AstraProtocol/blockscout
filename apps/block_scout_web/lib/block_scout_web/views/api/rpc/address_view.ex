@@ -239,6 +239,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "cumulativeGasUsed" => "#{transaction.cumulative_gas_used}",
       "gasUsed" => "#{transaction.gas_used}",
       "success" => if(transaction.status == :ok, do: true, else: false),
+      "error" => "#{transaction.error}",
       "contractAddress" => "#{transaction.created_contract_address_hash}",
       "contractMethodName" => get_contract_method_name(transaction.input)
     }
