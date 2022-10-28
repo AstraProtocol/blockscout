@@ -47,9 +47,14 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     RPCView.render("show.json", data: data)
   end
 
-  def render("txlist.json", %{transactions: transactions}) do
-    data = Enum.map(transactions, &prepare_transaction/1)
-    RPCView.render("show.json", data: data)
+  def render("txlist.json", %{
+    transactions: transactions, has_next_page: has_next_page, next_page_path: next_page_path}) do
+    data = %{
+      "result" => Enum.map(transactions, &prepare_transaction/1),
+      "hasNextPage" => has_next_page,
+      "nextPagePath" => next_page_path
+    }
+    RPCView.render("show_data.json", data: data)
   end
 
   def render("txlistinternal.json", %{internal_transactions: internal_transactions}) do
@@ -220,23 +225,22 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
   defp prepare_transaction(transaction) do
     %{
       "blockNumber" => "#{transaction.block_number}",
-      "timeStamp" => "#{DateTime.to_unix(transaction.block_timestamp)}",
+      "timeStamp" => "#{DateTime.to_unix(transaction.block.timestamp)}",
       "hash" => "#{transaction.hash}",
-      "nonce" => "#{transaction.nonce}",
+      "cosmosHash" => "#{transaction.cosmos_hash}",
       "blockHash" => "#{transaction.block_hash}",
-      "transactionIndex" => "#{transaction.index}",
       "from" => "#{transaction.from_address_hash}",
+      "fromAddressName" => prepare_address_name(transaction.from_address),
       "to" => "#{transaction.to_address_hash}",
+      "toAddressName" => prepare_address_name(transaction.to_address),
       "value" => "#{transaction.value.value}",
       "gas" => "#{transaction.gas}",
       "gasPrice" => "#{transaction.gas_price.value}",
-      "isError" => if(transaction.status == :ok, do: "0", else: "1"),
-      "txreceipt_status" => if(transaction.status == :ok, do: "1", else: "0"),
-      "input" => "#{transaction.input}",
-      "contractAddress" => "#{transaction.created_contract_address_hash}",
       "cumulativeGasUsed" => "#{transaction.cumulative_gas_used}",
       "gasUsed" => "#{transaction.gas_used}",
-      "confirmations" => "#{transaction.confirmations}"
+      "success" => if(transaction.status == :ok, do: true, else: false),
+      "contractAddress" => "#{transaction.created_contract_address_hash}",
+      "contractMethodName" => get_contract_method_name(transaction.input)
     }
   end
 
