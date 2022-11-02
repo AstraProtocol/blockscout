@@ -30,6 +30,63 @@ defmodule BlockScoutWeb.API.RPC.TokenController do
     end
   end
 
+  def getinventory(conn, params) do
+    pagination_options = Helpers.put_pagination_options(%{}, params)
+    with {:contractaddress_param, {:ok, contractaddress_param}} <- fetch_contractaddress(params),
+         {:format, {:ok, address_hash}} <- to_address_hash(contractaddress_param),
+         {:ok, token} <- Chain.token_from_address_hash(address_hash) do
+
+      options_with_defaults =
+        pagination_options
+        |> Map.put_new(:page_number, 0)
+        |> Map.put_new(:page_size, 10)
+
+      options = %PagingOptions{
+        key: nil,
+        page_number: options_with_defaults.page_number,
+        page_size: options_with_defaults.page_size + 1
+      }
+
+      unique_tokens_plus_one = Chain.address_to_unique_tokens(
+        token.contract_address_hash,
+        paging_options_unique_tokens(params, options)
+      )
+
+      {unique_tokens, next_page} = split_list_by_page(unique_tokens_plus_one, options_with_defaults.page_size)
+
+      if length(next_page) > 0 do
+        last_unique_tokens = Enum.at(unique_tokens, -1)
+        next_page_params = %{
+          "page" => get_next_page_number(options_with_defaults.page_number),
+          "offset" => options_with_defaults.page_size,
+          "token_id" => last_unique_tokens.token_id
+        }
+
+        render(conn, "getinventory.json", %{
+          unique_tokens: unique_tokens,
+          has_next_page: true,
+          next_page_path: next_page_path(next_page_params)}
+        )
+      else
+        render(conn, "getinventory.json", %{
+          unique_tokens: unique_tokens,
+          has_next_page: false,
+          next_page_path: ""}
+        )
+      end
+
+    else
+      {:contractaddress_param, :error} ->
+        render(conn, :error, error: "Query parameter contract address is required")
+
+      {:format, :error} ->
+        render(conn, :error, error: "Invalid contract address hash")
+
+      {:error, :not_found} ->
+        render(conn, :error, error: "Cannot found token from contract address hash")
+    end
+  end
+
   def getlisttokentransfers(conn, params) do
     pagination_options = Helpers.put_pagination_options(%{}, params)
     with {:contractaddress_param, {:ok, contractaddress_param}} <- fetch_contractaddress(params),
@@ -161,6 +218,14 @@ defmodule BlockScoutWeb.API.RPC.TokenController do
   defp paging_options_token_transfer_list(params, paging_options) do
     if !is_nil(params["block_number"]) and !is_nil(params["index"]) do
       [paging_options: %{paging_options | key: {params["block_number"], params["index"]}}]
+    else
+      [paging_options: paging_options]
+    end
+  end
+
+  defp paging_options_unique_tokens(params, paging_options) do
+    if !is_nil(params["token_id"]) do
+      [paging_options: %{paging_options | key: {params["token_id"]}}]
     else
       [paging_options: paging_options]
     end
