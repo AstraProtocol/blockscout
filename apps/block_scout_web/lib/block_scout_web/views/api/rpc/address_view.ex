@@ -16,10 +16,10 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "balance" => address_detail.fetched_coin_balance.value,
       "tokenName" => to_string(address_detail.token && address_detail.token.name),
       "tokenSymbol" => to_string(address_detail.token && address_detail.token.symbol),
-      "creationTransaction" => to_string(address_detail.contracts_creation_transaction &&
-        address_detail.contracts_creation_transaction.hash),
-      "creator" => to_string(address_detail.contracts_creation_transaction &&
-        address_detail.contracts_creation_transaction.from_address_hash),
+      "creationTransaction" => to_string(address_detail.contracts_creation_internal_transaction &&
+        address_detail.contracts_creation_internal_transaction.transaction_hash),
+      "creator" => to_string(address_detail.contracts_creation_internal_transaction &&
+        address_detail.contracts_creation_internal_transaction.from_address_hash),
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
       "type" => get_address_type(address_detail)
     }
