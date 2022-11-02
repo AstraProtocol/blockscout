@@ -7,6 +7,16 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
     RPCView.render("show.json", data: prepare_token(token_detail))
   end
 
+  def render("getinventory.json", %{
+    unique_tokens: unique_tokens, has_next_page: has_next_page, next_page_path: next_page_path}) do
+    data = %{
+      "result" => Enum.map(unique_tokens, &prepare_unique_tokens/1),
+      "hasNextPage" => has_next_page,
+      "nextPagePath" => next_page_path
+    }
+    RPCView.render("show_data.json", data: data)
+  end
+
   def render("getlisttokentransfers.json", %{
     token_transfers: token_transfers, has_next_page: has_next_page, next_page_path: next_page_path}) do
     data = %{
@@ -68,6 +78,14 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
     %{
       "address" => to_string(token_holder.address_hash),
       "value" => token_holder.value
+    }
+  end
+
+  defp prepare_unique_tokens(unique_token) do
+    %{
+      "tokenId" => unique_token.instance.token_id,
+      "ownerAddress" => to_string(unique_token.to_address_hash),
+      "metadata" => unique_token.instance.metadata
     }
   end
 
