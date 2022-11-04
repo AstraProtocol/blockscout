@@ -3,6 +3,8 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
 
   alias BlockScoutWeb.API.RPC.RPCView
 
+  require Logger
+
   def render("gettxinfo.json", %{
         transaction: transaction,
         block_height: block_height,
@@ -106,6 +108,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   end
 
   defp prepare_token_transfer(token_transfer) do
+    Logger.info(token_transfer)
     %{
       "amount" => "#{token_transfer.amount}",
       "logIndex" => "#{token_transfer.log_index}",
@@ -116,6 +119,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       "tokenContractAddress" => "#{token_transfer.token_contract_address}",
       "tokenName" => "#{token_transfer.token.name}",
       "tokenSymbol" => "#{token_transfer.token.symbol}",
+      "tokenId" => "#{token_transfer.token_id}",
       "decimals" => "#{token_transfer.token.decimals}"
     }
   end
