@@ -83,7 +83,7 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
 
   defp prepare_unique_tokens(unique_token) do
     %{
-      "tokenId" => unique_token.instance.token_id,
+      "tokenId" => "#{unique_token.instance.token_id}",
       "ownerAddress" => to_string(unique_token.to_address_hash),
       "metadata" => unique_token.instance.metadata
     }
@@ -103,6 +103,7 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
       "tokenContractAddress" => "#{token_transfer.token_contract_address}",
       "tokenName" => "#{token_transfer.token.name}",
       "tokenSymbol" => "#{token_transfer.token.symbol}",
+      "tokenId" => "#{token_transfer.token_id}",
       "decimals" => "#{token_transfer.token.decimals}"
     }
   end
