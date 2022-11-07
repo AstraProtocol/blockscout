@@ -2428,6 +2428,30 @@ defmodule Explorer.Chain do
   end
 
   @doc """
+  Get all internal transactions of a transaction
+  """
+  @spec get_internal_transactions_by_transaction_hash(Hash.Full.t()) :: [InternalTransaction.t()]
+  def get_internal_transactions_by_transaction_hash(%Hash{byte_count: unquote(Hash.Full.byte_count())} = transaction_hash) do
+    with :ok <- Chain.check_transaction_exists(transaction_hash) do
+      Chain.transaction_to_internal_transactions(
+        transaction_hash,
+        necessity_by_association: %{
+          [created_contract_address: :names] => :optional,
+          [from_address: :names] => :optional,
+          [to_address: :names] => :optional,
+          [transaction: :block] => :optional,
+          [created_contract_address: :smart_contract] => :optional,
+          [from_address: :smart_contract] => :optional,
+          [to_address: :smart_contract] => :optional
+        }
+      )
+    else
+      _ ->
+        []
+    end
+  end
+
+  @doc """
   Finds all Blocks validated by the address with the given hash.
 
     ## Options

@@ -99,25 +99,27 @@ defmodule Explorer.Etherscan do
       even when they are alone in the parent transaction
 
   """
-  @spec list_internal_transactions(Hash.Full.t()) :: [InternalTransaction.t()]
+  @spec list_internal_transactions(Hash.Full.t()) :: [map()]
   def list_internal_transactions(%Hash{byte_count: unquote(Hash.Full.byte_count())} = transaction_hash) do
-    with :ok <- Chain.check_transaction_exists(transaction_hash) do
-      Chain.transaction_to_internal_transactions(
-        transaction_hash,
-        necessity_by_association: %{
-          [created_contract_address: :names] => :optional,
-          [from_address: :names] => :optional,
-          [to_address: :names] => :optional,
-          [transaction: :block] => :optional,
-          [created_contract_address: :smart_contract] => :optional,
-          [from_address: :smart_contract] => :optional,
-          [to_address: :smart_contract] => :optional
-        }
+    query =
+      from(
+        it in InternalTransaction,
+        inner_join: t in assoc(it, :transaction),
+        inner_join: b in assoc(t, :block),
+        where: it.transaction_hash == ^transaction_hash,
+        limit: 10_000,
+        select:
+          merge(map(it, ^@internal_transaction_fields), %{
+            block_timestamp: b.timestamp,
+            block_number: b.number
+          })
       )
-    else
-     _ ->
-       []
-    end
+
+    query
+    |> Chain.where_transaction_has_multiple_internal_transactions()
+    |> InternalTransaction.where_is_different_from_parent_transaction()
+    |> InternalTransaction.where_nonpending_block()
+    |> Repo.replica().all()
   end
 
   @doc """
@@ -200,6 +202,14 @@ defmodule Explorer.Etherscan do
       query_to_address_hash_wrapped
       |> union(^query_from_address_hash_wrapped)
       |> union(^query_created_contract_address_hash_wrapped)
+      |> Chain.wrapped_union_subquery()
+      |> order_by(
+        [q],
+        [
+          {^options.order_by_direction, q.block_number},
+          desc: q.index
+        ]
+      )
       |> Repo.replica().all()
     else
       query =
