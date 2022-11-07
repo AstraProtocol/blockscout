@@ -117,6 +117,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       "tokenName" => "#{token_transfer.token.name}",
       "tokenSymbol" => "#{token_transfer.token.symbol}",
       "tokenId" => "#{token_transfer.token_id}",
+      "tokenType" => "#{token_transfer.token.type}",
       "decimals" => "#{token_transfer.token.decimals}"
     }
   end
