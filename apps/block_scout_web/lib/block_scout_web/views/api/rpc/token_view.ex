@@ -7,6 +7,13 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
     RPCView.render("show.json", data: prepare_token(token_detail))
   end
 
+  def render("getmetadata.json", %{token_instance: token_instance}) do
+    data = %{
+      "result" => token_instance.instance.metadata
+    }
+    RPCView.render("show.json", data: data)
+  end
+
   def render("getinventory.json", %{
     unique_tokens: unique_tokens, has_next_page: has_next_page, next_page_path: next_page_path}) do
     data = %{

@@ -30,6 +30,36 @@ defmodule BlockScoutWeb.API.RPC.TokenController do
     end
   end
 
+  def getmetadata(conn, params) do
+    with {:contractaddress_param, {:ok, contractaddress_param}} <- fetch_contractaddress(params),
+         {:tokenid_param, {:ok, tokenid_param}} <- fetch_tokenid(params),
+         {:format, {:ok, address_hash}} <- to_address_hash(contractaddress_param),
+         :ok <- Chain.check_erc721_token_instance_exists(tokenid_param, address_hash) do
+      case Chain.erc721_token_instance_from_token_id_and_token_address(
+             tokenid_param,
+             address_hash
+           )
+        do
+        {:ok, token_instance} ->
+          render(conn, "getmetadata.json", %{token_instance: token_instance})
+        _ ->
+          render(conn, :error, error: "Token instance not found")
+      end
+    else
+      {:contractaddress_param, :error} ->
+        render(conn, :error, error: "Query parameter contract address is required")
+
+      {:tokenid_param, :error} ->
+        render(conn, :error, error: "Query parameter token id is required")
+
+      {:format, :error} ->
+        render(conn, :error, error: "Invalid contract address hash")
+
+      :not_found ->
+        render(conn, :error, error: "Token instance not found")
+    end
+  end
+
   def getinventory(conn, params) do
     pagination_options = Helpers.put_pagination_options(%{}, params)
     with {:contractaddress_param, {:ok, contractaddress_param}} <- fetch_contractaddress(params),
@@ -235,6 +265,10 @@ defmodule BlockScoutWeb.API.RPC.TokenController do
 
   defp fetch_contractaddress(params) do
     {:contractaddress_param, Map.fetch(params, "contractaddress")}
+  end
+
+  defp fetch_tokenid(params) do
+    {:tokenid_param, Map.fetch(params, "tokenid")}
   end
 
   defp to_address_hash(address_hash_string) do
