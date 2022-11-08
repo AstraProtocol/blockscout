@@ -7,7 +7,7 @@ on:
 env:
   OTP_VERSION: '24.3.4.1'
   ELIXIR_VERSION: '1.13.4'
-  NEXT_RELEASE_VERSION: 4.1.8
+  NEXT_RELEASE_VERSION: 5.0.0
 
 jobs:
   push_to_registry:
@@ -53,6 +53,8 @@ jobs:
           context: .
           file: ./docker/Dockerfile
           push: true
+          cache-from: type=registry,ref=blockscout/blockscout:buildcache
+          cache-to: type=registry,ref=blockscout/blockscout:buildcache,mode=max
           tags: blockscout/blockscout:latest, blockscout/blockscout:${{ env.NEXT_RELEASE_VERSION }}-prerelease-${{ env.SHORT_SHA }}
           build-args: |
             CACHE_EXCHANGE_RATES_PERIOD=
@@ -68,15 +70,13 @@ jobs:
             DISABLE_BRIDGE_MARKET_CAP_UPDATER=false
             CACHE_BRIDGE_MARKET_CAP_UPDATE_INTERVAL=
             SOCKET_ROOT=
-            CHAIN_ID=
-            JSON_RPC=
-            COIN_NAME=ASA
-            SUBNETWORK=
   tests:
     needs: push_to_registry
-    uses: blockscout/blockscout-ci-cd/.github/workflows/e2e_k8s.yaml@master
+    uses: blockscout/blockscout-ci-cd/.github/workflows/e2e_new.yaml@master
     with:
-      blockscout_image: blockscout/blockscout:${{ needs.push_to_registry.outputs.release-version }}-prerelease-${{ needs.push_to_registry.outputs.short-sha }}
-      environment: 'test'
-      verification_image: 'ghcr.io/blockscout/verification:latest'
+      blockscoutImage: blockscout/blockscout:${{ needs.push_to_registry.outputs.release-version }}-prerelease-${{ needs.push_to_registry.outputs.short-sha }}
+      blockscoutIngressHost: e2e-blockscout-$GITHUB_SHA_SHORT
+      frontendIngressHost: e2e-blockscout-$GITHUB_SHA_SHORT
+      gethIngressHost: e2e-geth-$GITHUB_SHA_SHORT
+      scVerifierIngressHost: e2e-sc-verifier-$GITHUB_SHA_SHORT
     secrets: inherit
