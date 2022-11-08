@@ -23,6 +23,11 @@ $navbar-logo-width: 100% !default;
   }
 
   .navbar-nav {
+
+    .nav-submenu {
+      padding: 10px 20px;
+      color: $header-links-color; 
+    }
     
     .nav-link {
       outline: none;
@@ -233,7 +238,6 @@ $navbar-logo-width: 100% !default;
 }
 
 .navbar-brand {
-  align-items: center !important;
   margin-left: 0;
   flex-shrink: 1;
   display: inline-flex;

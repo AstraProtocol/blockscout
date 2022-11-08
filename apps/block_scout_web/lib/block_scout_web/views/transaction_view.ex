@@ -2,6 +2,7 @@ defmodule BlockScoutWeb.TransactionView do
   use BlockScoutWeb, :view
 
   alias BlockScoutWeb.{AccessHelpers, AddressView, BlockView, TabHelpers}
+  alias BlockScoutWeb.Account.AuthController
   alias BlockScoutWeb.Cldr.Number
   alias Explorer.{Chain, CustomContractsHelpers, Repo}
   alias Explorer.Chain.Block.Reward
@@ -11,10 +12,10 @@ defmodule BlockScoutWeb.TransactionView do
   alias Timex.Duration
 
   import BlockScoutWeb.Gettext
-  import BlockScoutWeb.AddressView, only: [from_address_hash: 1, short_token_id: 2]
+  import BlockScoutWeb.AddressView, only: [from_address_hash: 1, short_token_id: 2, tag_name_to_label: 1]
   import BlockScoutWeb.Tokens.Helpers
 
-  @tabs ["token-transfers", "internal-transactions", "logs", "raw-trace"]
+  @tabs ["token-transfers", "internal-transactions", "logs", "raw-trace", "state"]
 
   @token_burning_title "Token Burning"
   @token_minting_title "Token Minting"
@@ -512,6 +513,7 @@ defmodule BlockScoutWeb.TransactionView do
   defp tab_name(["internal-transactions"]), do: gettext("Internal Transactions")
   defp tab_name(["logs"]), do: gettext("Logs")
   defp tab_name(["raw-trace"]), do: gettext("Raw Trace")
+  defp tab_name(["state"]), do: gettext("State changes")
 
   defp get_transaction_type_from_token_transfers(token_transfers) do
     token_transfers_types =
@@ -573,19 +575,19 @@ defmodule BlockScoutWeb.TransactionView do
 
     case revert_reason do
       "0x" <> hex_part ->
-        process_hex_revert_reason(hex_part)
+        proccess_hex_revert_reason(hex_part)
 
       hex_part ->
-        process_hex_revert_reason(hex_part)
+        proccess_hex_revert_reason(hex_part)
     end
   end
 
   # Function converts hex revert reason to the binary
-  @spec process_hex_revert_reason(nil) :: nil
-  defp process_hex_revert_reason(nil), do: nil
+  @spec proccess_hex_revert_reason(nil) :: nil
+  defp proccess_hex_revert_reason(nil), do: nil
 
-  @spec process_hex_revert_reason(binary()) :: binary()
-  defp process_hex_revert_reason(hex_revert_reason) do
+  @spec proccess_hex_revert_reason(binary()) :: binary()
+  defp proccess_hex_revert_reason(hex_revert_reason) do
     case Integer.parse(hex_revert_reason, 16) do
       {number, ""} ->
         :binary.encode_unsigned(number)
