@@ -10,7 +10,6 @@ defmodule Explorer.Chain.Hash do
   @hexadecimal_digits_per_byte 2
   @max_byte_count 32
 
-  @derive Jason.Encoder
   defstruct ~w(byte_count bytes)a
 
   @typedoc """
