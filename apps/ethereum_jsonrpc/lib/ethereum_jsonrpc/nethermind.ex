@@ -1,11 +1,11 @@
 # credo:disable-for-this-file
-defmodule EthereumJSONRPC.Besu do
+defmodule EthereumJSONRPC.Nethermind do
   @moduledoc """
-  Ethereum JSONRPC methods that are only supported by [Besu](https://besu.hyperledger.org/en/stable/Reference/API-Methods).
+  Ethereum JSONRPC methods that are only supported by Nethermind.
   """
   import EthereumJSONRPC, only: [id_to_params: 1, integer_to_quantity: 1, json_rpc: 2]
 
-  alias EthereumJSONRPC.Besu.Traces
+  alias EthereumJSONRPC.Nethermind.Traces
   alias EthereumJSONRPC.{FetchedBeneficiaries, PendingTransaction, TraceReplayBlockTransactions, Transaction}
 
   @behaviour EthereumJSONRPC.Variant
@@ -30,7 +30,7 @@ defmodule EthereumJSONRPC.Besu do
   def fetch_internal_transactions(_transactions_params, _json_rpc_named_arguments), do: :ignore
 
   @doc """
-  Fetches the `t:Explorer.Chain.InternalTransaction.changeset/2` params from the Besu trace URL.
+  Fetches the `t:Explorer.Chain.InternalTransaction.changeset/2` params from the Nethermind trace URL.
   """
   @impl EthereumJSONRPC.Variant
   def fetch_block_internal_transactions(block_numbers, json_rpc_named_arguments) when is_list(block_numbers) do
@@ -43,7 +43,7 @@ defmodule EthereumJSONRPC.Besu do
   end
 
   @doc """
-  Fetches the pending transactions from the Besu node.
+  Fetches the pending transactions from the Nethermind node.
 
   *NOTE*: The pending transactions are local to the node that is contacted and may not be consistent across nodes based
   on the transactions that each node has seen and how each node prioritizes collating transactions into the next block.
@@ -52,7 +52,11 @@ defmodule EthereumJSONRPC.Besu do
   @spec fetch_pending_transactions(EthereumJSONRPC.json_rpc_named_arguments()) ::
           {:ok, [Transaction.params()]} | {:error, reason :: term}
   def fetch_pending_transactions(json_rpc_named_arguments) do
-    PendingTransaction.fetch_pending_transactions_besu(json_rpc_named_arguments)
+    if Application.get_env(:ethereum_jsonrpc, EthereumJSONRPC.PendingTransaction)[:type] == "geth" do
+      PendingTransaction.fetch_pending_transactions_geth(json_rpc_named_arguments)
+    else
+      PendingTransaction.fetch_pending_transactions_parity(json_rpc_named_arguments)
+    end
   end
 
   defp block_numbers_to_params_list(block_numbers) when is_list(block_numbers) do
