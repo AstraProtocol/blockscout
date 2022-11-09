@@ -3700,6 +3700,7 @@ defmodule Explorer.Chain do
       :error
 
   """
+  @spec string_to_transaction_hash(String.t()) :: {:ok, Hash.t()} | :error
   def string_to_transaction_hash(string) when is_binary(string) do
     case is_eth_tx(string) do
       true ->
@@ -4870,6 +4871,12 @@ defmodule Explorer.Chain do
       ctb.value < ^value or (ctb.value == ^value and t.type < ^type) or
         (ctb.value == ^value and t.type == ^type and t.name < ^name)
     )
+  end
+
+  defp page_verified_contracts(query, %PagingOptions{key: nil}), do: query
+
+  defp page_verified_contracts(query, %PagingOptions{key: {id}}) do
+    where(query, [contract], contract.id < ^id)
   end
 
   @doc """
@@ -6621,5 +6628,224 @@ defmodule Explorer.Chain do
     hash
     |> to_string()
     |> String.downcase()
+  end
+
+  def recent_transactions(options, [:pending | _], method_id_filter, type_filter_options) do
+    recent_pending_transactions(options, false, method_id_filter, type_filter_options)
+  end
+
+  def recent_transactions(options, _, method_id_filter, type_filter_options) do
+    recent_collated_transactions(false, options, method_id_filter, type_filter_options)
+  end
+
+  def apply_filter_by_method_id_to_transactions(query, filter) when is_list(filter) do
+    method_ids = Enum.flat_map(filter, &map_name_or_method_id_to_method_id/1)
+
+    if method_ids != [] do
+      query
+      |> where([tx], fragment("SUBSTRING(? FOR 4)", tx.input) in ^method_ids)
+    else
+      query
+    end
+  end
+
+  def apply_filter_by_method_id_to_transactions(query, filter),
+    do: apply_filter_by_method_id_to_transactions(query, [filter])
+
+  defp map_name_or_method_id_to_method_id(string) when is_binary(string) do
+    if id = @method_name_to_id_map[string] do
+      decode_method_id(id)
+    else
+      trimmed =
+        string
+        |> String.replace("0x", "", global: false)
+
+      decode_method_id(trimmed)
+    end
+  end
+
+  defp decode_method_id(method_id) when is_binary(method_id) do
+    case String.length(method_id) == 8 && Base.decode16(method_id, case: :mixed) do
+      {:ok, bytes} ->
+        [bytes]
+
+      _ ->
+        []
+    end
+  end
+
+  def apply_filter_by_tx_type_to_transactions(query, [_ | _] = filter) do
+    {dynamic, modified_query} = apply_filter_by_tx_type_to_transactions_inner(filter, query)
+
+    modified_query
+    |> where(^dynamic)
+  end
+
+  def apply_filter_by_tx_type_to_transactions(query, _filter), do: query
+
+  def apply_filter_by_tx_type_to_transactions_inner(dynamic \\ dynamic(false), filter, query)
+
+  def apply_filter_by_tx_type_to_transactions_inner(dynamic, [type | remain], query) do
+    case type do
+      :contract_call ->
+        dynamic
+        |> filter_contract_call_dynamic()
+        |> apply_filter_by_tx_type_to_transactions_inner(
+          remain,
+          join(query, :inner, [tx], address in assoc(tx, :to_address), as: :to_address)
+        )
+
+      :contract_creation ->
+        dynamic
+        |> filter_contract_creation_dynamic()
+        |> apply_filter_by_tx_type_to_transactions_inner(remain, query)
+
+      :coin_transfer ->
+        dynamic
+        |> filter_transaction_dynamic()
+        |> apply_filter_by_tx_type_to_transactions_inner(remain, query)
+
+      :token_transfer ->
+        dynamic
+        |> filter_token_transfer_dynamic()
+        |> apply_filter_by_tx_type_to_transactions_inner(remain, query)
+
+      :token_creation ->
+        dynamic
+        |> filter_token_creation_dynamic()
+        |> apply_filter_by_tx_type_to_transactions_inner(
+          remain,
+          join(query, :inner, [tx], token in Token,
+            on: token.contract_address_hash == tx.created_contract_address_hash,
+            as: :created_token
+          )
+        )
+    end
+  end
+
+  def apply_filter_by_tx_type_to_transactions_inner(dynamic_query, _, query), do: {dynamic_query, query}
+
+  def filter_contract_creation_dynamic(dynamic) do
+    dynamic([tx], ^dynamic or is_nil(tx.to_address_hash))
+  end
+
+  def filter_transaction_dynamic(dynamic) do
+    dynamic([tx], ^dynamic or tx.value > ^0)
+  end
+
+  def filter_contract_call_dynamic(dynamic) do
+    dynamic([tx, to_address: to_address], ^dynamic or not is_nil(to_address.contract_code))
+  end
+
+  def filter_token_transfer_dynamic(dynamic) do
+    # TokenTransfer.__struct__.__meta__.source
+    dynamic(
+      [tx],
+      ^dynamic or
+        fragment(
+          "NOT (SELECT transaction_hash FROM token_transfers WHERE transaction_hash = ? LIMIT 1) IS NULL",
+          tx.hash
+        )
+    )
+  end
+
+  def filter_token_creation_dynamic(dynamic) do
+    dynamic([tx, created_token: created_token], ^dynamic or (is_nil(tx.to_address_hash) and not is_nil(created_token)))
+  end
+
+  @spec verified_contracts([
+          paging_options | necessity_by_association_option | {:filter, :solidity | :vyper} | {:search, String.t()}
+        ]) :: [SmartContract.t()]
+  def verified_contracts(options \\ []) do
+    paging_options = Keyword.get(options, :paging_options, @default_paging_options)
+    necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
+    filter = Keyword.get(options, :filter, nil)
+    search_string = Keyword.get(options, :search, nil)
+
+    query = from(contract in SmartContract, select: contract, order_by: [desc: :id])
+
+    query
+    |> filter_contracts(filter)
+    |> search_contracts(search_string)
+    |> handle_verified_contracts_paging_options(paging_options)
+    |> join_associations(necessity_by_association)
+    |> Repo.all()
+  end
+
+  defp search_contracts(basic_query, nil), do: basic_query
+
+  defp search_contracts(basic_query, search_string) do
+    from(contract in basic_query,
+      where:
+        ilike(contract.name, ^"%#{search_string}%") or
+          ilike(fragment("'0x' || encode(?, 'hex')", contract.address_hash), ^"%#{search_string}%")
+    )
+  end
+
+  defp filter_contracts(basic_query, :solidity) do
+    basic_query
+    |> where(is_vyper_contract: ^false)
+  end
+
+  defp filter_contracts(basic_query, :vyper) do
+    basic_query
+    |> where(is_vyper_contract: ^true)
+  end
+
+  defp filter_contracts(basic_query, _), do: basic_query
+
+  def count_verified_contracts do
+    Repo.aggregate(SmartContract, :count, timeout: :infinity)
+  end
+
+  def count_new_verified_contracts do
+    query =
+      from(contract in SmartContract,
+        select: contract.inserted_at,
+        where: fragment("NOW() - ? at time zone 'UTC' <= interval '24 hours'", contract.inserted_at)
+      )
+
+    query
+    |> Repo.aggregate(:count, timeout: :infinity)
+  end
+
+  def count_contracts do
+    query =
+      from(address in Address,
+        select: address,
+        where: not is_nil(address.contract_code)
+      )
+
+    query
+    |> Repo.aggregate(:count, timeout: :infinity)
+  end
+
+  def count_new_contracts do
+    query =
+      from(tx in Transaction,
+        select: tx,
+        where:
+          tx.status == ^:ok and
+            fragment("NOW() - ? at time zone 'UTC' <= interval '24 hours'", tx.created_contract_code_indexed_at)
+      )
+
+    query
+    |> Repo.aggregate(:count, timeout: :infinity)
+  end
+
+  def count_verified_contracts_from_cache do
+    VerifiedContractsCounter.fetch()
+  end
+
+  def count_new_verified_contracts_from_cache do
+    NewVerifiedContractsCounter.fetch()
+  end
+
+  def count_contracts_from_cache do
+    ContractsCounter.fetch()
+  end
+
+  def count_new_contracts_from_cache do
+    NewContractsCounter.fetch()
   end
 end
