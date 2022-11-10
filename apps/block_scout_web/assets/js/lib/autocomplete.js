@@ -2,7 +2,6 @@ import $ from 'jquery'
 import AutoComplete from '@tarekraafat/autocomplete.js/dist/autoComplete'
 import { getTextAdData, fetchTextAdData } from './ad'
 import { DateTime } from 'luxon'
-import { astraToEth } from '@astradefi/address-converter'
 import { appendTokenIcon } from './token_icon'
 import { escapeHtml } from './utils'
 import xss from 'xss'
@@ -125,9 +124,6 @@ const config = (id) => {
     query: (input) => {
       // Auto convert astra address to ether address
       let inputModified = input
-      if (inputModified.startsWith('astra')) {
-        inputModified = astraToEth(input)
-      }
       return xss(inputModified)
     },
     events: {
