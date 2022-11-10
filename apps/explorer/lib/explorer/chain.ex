@@ -2184,6 +2184,21 @@ defmodule Explorer.Chain do
        end
   end
 
+  @spec cosmos_hash_to_transaction_hash(String.t()) :: {:ok, Hash.t()} | {:error, :not_found}
+  def cosmos_hash_to_transaction_hash(cosmos_hash) do
+
+    Transaction
+    |> where(cosmos_hash: ^cosmos_hash)
+    |> Repo.one()
+    |> case do
+         nil ->
+           {:error, :not_found}
+
+         transaction ->
+           {:ok, transaction.hash}
+       end
+  end
+
   def preload_transaction_token_address_names(transaction) do
     Repo.preload(transaction, token_transfers: [[from_address: :names], [to_address: :names]])
   end
@@ -3712,20 +3727,12 @@ defmodule Explorer.Chain do
 
   @spec is_eth_tx(String.t()) :: true | false
   def is_eth_tx(string) do
-    if String.starts_with?(string, "0x") do
-      true
-    else
-      false
-    end
+    String.match?(string, ~r/^0x[a-fA-F0-9]{64}$/)
   end
 
   @spec is_cosmos_tx(String.t()) :: true | false
   def is_cosmos_tx(string) do
-    if String.length(string) == 64 and String.match?(string, ~r/^[A-Z0-9]/) do
-      true
-    else
-      false
-    end
+    String.match?(string, ~r/^[A-F0-9]{64}$/)
   end
 
   @doc """
