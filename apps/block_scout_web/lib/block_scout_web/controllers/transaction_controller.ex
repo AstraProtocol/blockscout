@@ -128,108 +128,32 @@ defmodule BlockScoutWeb.TransactionController do
   end
 
   def show(conn, %{"id" => transaction_hash_string, "type" => "JSON"}) do
-    case Chain.string_to_transaction_hash(transaction_hash_string) do
-      {:ok, transaction_hash} ->
-        if Chain.transaction_has_token_transfers?(transaction_hash) do
-          TransactionTokenTransferController.index(conn, %{
-            "transaction_id" => transaction_hash_string,
-            "type" => "JSON"
-          })
-        else
-          TransactionInternalTransactionController.index(conn, %{
-            "transaction_id" => transaction_hash_string,
-            "type" => "JSON"
-          })
-        end
-
-      :error ->
-        set_not_found_view(conn, transaction_hash_string)
+    case Chain.is_cosmos_tx(transaction_hash_string) do
+      true ->
+        show_token_transfers_or_internal_transaction(
+          conn,
+          to_string(Chain.cosmos_hash_to_transaction_hash(transaction_hash_string))
+        )
+      _ ->
+        show_token_transfers_or_internal_transaction(conn, transaction_hash_string)
     end
   end
 
   def show(conn, %{"id" => id} = params) do
     with {:ok, transaction_hash} <- Chain.string_to_transaction_hash(id),
          :ok <- Chain.check_transaction_exists(transaction_hash) do
-      if Chain.transaction_has_token_transfers?(transaction_hash) do
-        with {:ok, transaction} <-
-               Chain.hash_to_transaction(
-                 transaction_hash,
-                 necessity_by_association: @necessity_by_association
-               ),
-             {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.from_address_hash), params),
-             {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.to_address_hash), params) do
-          render(
-            conn,
-            "show_token_transfers.html",
-            exchange_rate: Market.get_exchange_rate(Explorer.coin()) || Token.null(),
-            block_height: Chain.block_height(),
-            current_path: Controller.current_full_path(conn),
-            current_user: current_user(conn),
-            show_token_transfers: true,
-            transaction: transaction,
-            from_tags: get_address_tags(transaction.from_address_hash, current_user(conn)),
-            to_tags: get_address_tags(transaction.to_address_hash, current_user(conn)),
-            tx_tags:
-              get_transaction_with_addresses_tags(
-                transaction,
-                current_user(conn)
-              )
-          )
-        else
-          :not_found ->
-            set_not_found_view(conn, id)
-
-          :error ->
-            set_invalid_view(conn, id)
-
-          {:error, :not_found} ->
-            set_not_found_view(conn, id)
-
-          {:restricted_access, _} ->
-            set_not_found_view(conn, id)
-        end
-      else
-        with {:ok, transaction} <-
-               Chain.hash_to_transaction(
-                 transaction_hash,
-                 necessity_by_association: @necessity_by_association
-               ),
-             {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.from_address_hash), params),
-             {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.to_address_hash), params) do
-          render(
-            conn,
-            "show_internal_transactions.html",
-            exchange_rate: Market.get_exchange_rate(Explorer.coin()) || Token.null(),
-            current_path: Controller.current_full_path(conn),
-            current_user: current_user(conn),
-            block_height: Chain.block_height(),
-            show_token_transfers: Chain.transaction_has_token_transfers?(transaction_hash),
-            transaction: transaction,
-            from_tags: get_address_tags(transaction.from_address_hash, current_user(conn)),
-            to_tags: get_address_tags(transaction.to_address_hash, current_user(conn)),
-            tx_tags:
-              get_transaction_with_addresses_tags(
-                transaction,
-                current_user(conn)
-              )
-          )
-        else
-          :not_found ->
-            set_not_found_view(conn, id)
-
-          :error ->
-            set_invalid_view(conn, id)
-
-          {:error, :not_found} ->
-            set_not_found_view(conn, id)
-
-          {:restricted_access, _} ->
-            set_not_found_view(conn, id)
-        end
-      end
+      render_transaction(conn, id, params, transaction_hash)
     else
       :error ->
-        set_invalid_view(conn, id)
+        with true <- Chain.is_cosmos_tx(id),
+             {:ok, transaction_hash} <- Chain.cosmos_hash_to_transaction_hash(id) do
+          render_transaction(conn, id, params, transaction_hash)
+        else
+          false ->
+            set_invalid_view(conn, id)
+          {:error, :not_found} ->
+            set_not_found_view(conn, id)
+        end
 
       :not_found ->
         set_not_found_view(conn, id)
@@ -248,5 +172,105 @@ defmodule BlockScoutWeb.TransactionController do
     |> put_status(422)
     |> put_view(TransactionView)
     |> render("invalid.html", transaction_hash: transaction_hash_string)
+  end
+
+  defp render_transaction(conn, id, params, transaction_hash) do
+    if Chain.transaction_has_token_transfers?(transaction_hash) do
+      with {:ok, transaction} <-
+             Chain.hash_to_transaction(
+               transaction_hash,
+               necessity_by_association: @necessity_by_association
+             ),
+           {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.from_address_hash), params),
+           {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.to_address_hash), params) do
+        render(
+          conn,
+          "show_token_transfers.html",
+          exchange_rate: Market.get_exchange_rate(Explorer.coin()) || Token.null(),
+          block_height: Chain.block_height(),
+          current_path: Controller.current_full_path(conn),
+          current_user: current_user(conn),
+          show_token_transfers: true,
+          transaction: transaction,
+          from_tags: get_address_tags(transaction.from_address_hash, current_user(conn)),
+          to_tags: get_address_tags(transaction.to_address_hash, current_user(conn)),
+          tx_tags:
+            get_transaction_with_addresses_tags(
+              transaction,
+              current_user(conn)
+            )
+        )
+      else
+        :not_found ->
+          set_not_found_view(conn, id)
+
+        :error ->
+          set_invalid_view(conn, id)
+
+        {:error, :not_found} ->
+          set_not_found_view(conn, id)
+
+        {:restricted_access, _} ->
+          set_not_found_view(conn, id)
+      end
+    else
+      with {:ok, transaction} <-
+             Chain.hash_to_transaction(
+               transaction_hash,
+               necessity_by_association: @necessity_by_association
+             ),
+           {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.from_address_hash), params),
+           {:ok, false} <- AccessHelpers.restricted_access?(to_string(transaction.to_address_hash), params) do
+        render(
+          conn,
+          "show_internal_transactions.html",
+          exchange_rate: Market.get_exchange_rate(Explorer.coin()) || Token.null(),
+          current_path: Controller.current_full_path(conn),
+          current_user: current_user(conn),
+          block_height: Chain.block_height(),
+          show_token_transfers: Chain.transaction_has_token_transfers?(transaction_hash),
+          transaction: transaction,
+          from_tags: get_address_tags(transaction.from_address_hash, current_user(conn)),
+          to_tags: get_address_tags(transaction.to_address_hash, current_user(conn)),
+          tx_tags:
+            get_transaction_with_addresses_tags(
+              transaction,
+              current_user(conn)
+            )
+        )
+      else
+        :not_found ->
+          set_not_found_view(conn, id)
+
+        :error ->
+          set_invalid_view(conn, id)
+
+        {:error, :not_found} ->
+          set_not_found_view(conn, id)
+
+        {:restricted_access, _} ->
+          set_not_found_view(conn, id)
+      end
+    end
+  end
+
+  defp show_token_transfers_or_internal_transaction(conn, transaction_hash_string) do
+    case Chain.string_to_transaction_hash(transaction_hash_string) do
+      {:ok, transaction_hash} ->
+        if Chain.transaction_has_token_transfers?(transaction_hash) do
+          TransactionTokenTransferController.index(conn, %{
+            "transaction_id" => transaction_hash_string,
+            "type" => "JSON"
+          })
+        else
+          TransactionInternalTransactionController.index(conn, %{
+            "transaction_id" => transaction_hash_string,
+            "type" => "JSON"
+          })
+        end
+
+      :error ->
+        set_not_found_view(conn, transaction_hash_string)
+    end
   end
 end

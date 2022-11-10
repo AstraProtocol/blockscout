@@ -73,3 +73,5 @@ WORKDIR /app
 
 COPY --from=builder /opt/release/blockscout .
 COPY --from=builder /app/apps/explorer/node_modules ./node_modules
+
+CMD ["mix", "phx.server"]
