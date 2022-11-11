@@ -130,9 +130,10 @@ defmodule BlockScoutWeb.TransactionController do
   def show(conn, %{"id" => transaction_hash_string, "type" => "JSON"}) do
     case Chain.is_cosmos_tx(transaction_hash_string) do
       true ->
+        {:ok, transaction_hash} = Chain.cosmos_hash_to_transaction_hash(transaction_hash_string)
         show_token_transfers_or_internal_transaction(
           conn,
-          to_string(Chain.cosmos_hash_to_transaction_hash(transaction_hash_string))
+          to_string(transaction_hash)
         )
       _ ->
         show_token_transfers_or_internal_transaction(conn, transaction_hash_string)
