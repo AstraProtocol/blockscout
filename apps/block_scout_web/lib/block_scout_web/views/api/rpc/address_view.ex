@@ -12,8 +12,9 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
   end
 
   def render("getaddress.json", %{address_detail: address_detail}) do
+    contractName = prepare_address_name(address_detail)
     data = %{
-      "contractName" => prepare_address_name(address_detail),
+      "contractName" => contractName,
       "balance" => address_detail.fetched_coin_balance.value,
       "tokenName" => to_string(address_detail.token && address_detail.token.name),
       "tokenSymbol" => to_string(address_detail.token && address_detail.token.symbol),
