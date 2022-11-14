@@ -9,6 +9,7 @@ defmodule Explorer.Chain.Transaction do
 
   alias ABI.FunctionSelector
 
+  alias Ecto.Association.NotLoaded
   alias Ecto.Changeset
 
   alias Explorer.{Chain, Repo}
@@ -176,15 +177,12 @@ defmodule Explorer.Chain.Transaction do
 
   @derive {Poison.Encoder,
            only: [
-             :block_hash,
              :block_number,
              :cumulative_gas_used,
              :error,
              :gas,
              :gas_price,
              :gas_used,
-             :hash,
-             :cosmos_hash,
              :index,
              :created_contract_code_indexed_at,
              :input,
@@ -194,23 +192,17 @@ defmodule Explorer.Chain.Transaction do
              :v,
              :status,
              :value,
-             :revert_reason,
-             :max_priority_fee_per_gas,
-             :max_fee_per_gas,
-             :type
+             :revert_reason
            ]}
 
   @derive {Jason.Encoder,
            only: [
-             :block_hash,
              :block_number,
              :cumulative_gas_used,
              :error,
              :gas,
              :gas_price,
              :gas_used,
-             :hash,
-             :cosmos_hash,
              :index,
              :created_contract_code_indexed_at,
              :input,
@@ -220,10 +212,7 @@ defmodule Explorer.Chain.Transaction do
              :v,
              :status,
              :value,
-             :revert_reason,
-             :max_priority_fee_per_gas,
-             :max_fee_per_gas,
-             :type
+             :revert_reason
            ]}
 
   @primary_key {:hash, Hash.Full, autogenerate: false}
@@ -469,14 +458,14 @@ defmodule Explorer.Chain.Transaction do
   def decoded_revert_reason(transaction, revert_reason) do
     case revert_reason do
       "0x" <> hex_part ->
-        process_hex_revert_reason(hex_part, transaction)
+        proccess_hex_revert_reason(hex_part, transaction)
 
       hex_part ->
-        process_hex_revert_reason(hex_part, transaction)
+        proccess_hex_revert_reason(hex_part, transaction)
     end
   end
 
-  defp process_hex_revert_reason(hex_revert_reason, %__MODULE__{to_address: smart_contract, hash: hash}) do
+  defp proccess_hex_revert_reason(hex_revert_reason, %__MODULE__{to_address: smart_contract, hash: hash}) do
     case Integer.parse(hex_revert_reason, 16) do
       {number, ""} ->
         binary_revert_reason = :binary.encode_unsigned(number)
@@ -491,6 +480,18 @@ defmodule Explorer.Chain.Transaction do
   def decoded_input_data(%__MODULE__{to_address: nil}), do: {:error, :no_to_address}
   def decoded_input_data(%__MODULE__{input: %{bytes: bytes}}) when bytes in [nil, <<>>], do: {:error, :no_input_data}
   def decoded_input_data(%__MODULE__{to_address: %{contract_code: nil}}), do: {:error, :not_a_contract_call}
+
+  def decoded_input_data(%__MODULE__{
+        to_address: %{smart_contract: %NotLoaded{}},
+        input: input,
+        hash: hash
+      }) do
+    decoded_input_data(%__MODULE__{
+      to_address: %{smart_contract: nil},
+      input: input,
+      hash: hash
+    })
+  end
 
   def decoded_input_data(%__MODULE__{
         to_address: %{smart_contract: nil},
@@ -586,14 +587,16 @@ defmodule Explorer.Chain.Transaction do
 
   def get_method_name(_), do: "Transfer"
 
-  defp parse_method_name(method_desc) do
+  def parse_method_name(method_desc, need_upcase \\ true) do
     method_desc
     |> String.split("(")
     |> Enum.at(0)
-    |> upcase_first
+    |> upcase_first(need_upcase)
   end
 
-  defp upcase_first(<<first::utf8, rest::binary>>), do: String.upcase(<<first::utf8>>) <> rest
+  defp upcase_first(string, false), do: string
+
+  defp upcase_first(<<first::utf8, rest::binary>>, true), do: String.upcase(<<first::utf8>>) <> rest
 
   defp function_call(name, mapping) do
     text =
@@ -613,7 +616,6 @@ defmodule Explorer.Chain.Transaction do
     {:ok, result}
   rescue
     _ ->
-      Logger.warn("find_and_decode")
       Logger.warn(fn -> ["Could not decode input data for transaction: ", Hash.to_iodata(hash)] end)
       {:error, :could_not_decode}
   end
@@ -626,7 +628,6 @@ defmodule Explorer.Chain.Transaction do
     {:ok, mapping}
   rescue
     _ ->
-      Logger.warn("selector_mapping")
       Logger.warn(fn -> ["Could not decode input data for transaction: ", Hash.to_iodata(hash)] end)
       {:error, :could_not_decode}
   end
@@ -658,7 +659,7 @@ defmodule Explorer.Chain.Transaction do
     where(query, [t], not is_nil(t.block_number))
   end
 
-  def not_dropped_or_replaced_transactions(query) do
+  def not_dropped_or_replaced_transacions(query) do
     where(query, [t], is_nil(t.error) or t.error != "dropped/replaced")
   end
 

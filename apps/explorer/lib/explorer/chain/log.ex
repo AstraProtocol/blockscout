@@ -25,7 +25,7 @@ defmodule Explorer.Chain.Log do
    * `transaction` - transaction for which `log` is
    * `transaction_hash` - foreign key for `transaction`.
    * `index` - index of the log entry in all logs for the `transaction`
-   * `type` - type of event.  *Parity-only*
+   * `type` - type of event.  *Nethermind-only*
   """
   @type t :: %__MODULE__{
           address: %Ecto.Association.NotLoaded{} | Address.t(),
@@ -42,22 +42,6 @@ defmodule Explorer.Chain.Log do
           index: non_neg_integer(),
           type: String.t() | nil
         }
-
-  @derive {Poison.Encoder,
-    except: [
-      :__meta__,
-      :address,
-      :transaction,
-      :block
-    ]}
-
-  @derive {Jason.Encoder,
-    except: [
-      :__meta__,
-      :address,
-      :transaction,
-      :block
-    ]}
 
   @primary_key false
   schema "logs" do

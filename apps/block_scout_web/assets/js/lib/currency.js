@@ -41,7 +41,6 @@ export function formatAllUsdValues (root) {
   root.find('[data-usd-value]').each((i, el) => {
     el.innerHTML = formatUsdValue(el.dataset.usdValue)
   })
-
   root.find('[data-token-usd-value]').each((i, el) => {
     el.innerHTML = formatTokenUsdValue(el.dataset.tokenUsdValue)
   })
