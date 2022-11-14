@@ -22,7 +22,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "creator" => to_string(address_detail.contracts_creation_internal_transaction &&
         address_detail.contracts_creation_internal_transaction.from_address_hash),
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
-      "type" => get_address_type(address_detail)
+      "type" => get_address_type(contractName)
     }
     RPCView.render("show.json", data: data)
   end
@@ -413,9 +413,9 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     end
   end
 
-  defp get_address_type(address) do
-    case address.smart_contract do
-      nil ->
+  defp get_address_type(contractName) do
+    case contractName do
+      "" ->
         "address"
       _ ->
         "contractaddress"
