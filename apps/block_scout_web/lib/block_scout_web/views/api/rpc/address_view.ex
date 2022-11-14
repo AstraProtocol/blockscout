@@ -13,15 +13,17 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
 
   def render("getaddress.json", %{address_detail: address_detail}) do
     contractName = prepare_address_name(address_detail)
+    creationTransaction = prepare_creation_transaction(address_detail)
+    creator = prepare_creator(address_detail)
     data = %{
       "contractName" => contractName,
       "balance" => address_detail.fetched_coin_balance.value,
       "tokenName" => to_string(address_detail.token && address_detail.token.name),
       "tokenSymbol" => to_string(address_detail.token && address_detail.token.symbol),
-      "creationTransaction" => prepare_creation_transaction(address_detail),
-      "creator" => prepare_creator(address_detail),
+      "creationTransaction" => creationTransaction,
+      "creator" => creator,
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
-      "type" => get_address_type(contractName, address_detail)
+      "type" => get_address_type(creator)
     }
     RPCView.render("show.json", data: data)
   end
@@ -436,9 +438,8 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     end
   end
 
-  defp get_address_type(contractName, address_detail) do
-    if contractName == "" and is_nil(address_detail.smart_contract) and
-       is_nil(address_detail.contracts_creation_internal_transaction) do
+  defp get_address_type(creator) do
+    if creator == "" do
       "address"
     else
       "contractaddress"
