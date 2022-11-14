@@ -18,10 +18,8 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "balance" => address_detail.fetched_coin_balance.value,
       "tokenName" => to_string(address_detail.token && address_detail.token.name),
       "tokenSymbol" => to_string(address_detail.token && address_detail.token.symbol),
-      "creationTransaction" => to_string(address_detail.contracts_creation_internal_transaction &&
-        address_detail.contracts_creation_internal_transaction.transaction_hash),
-      "creator" => to_string(address_detail.contracts_creation_internal_transaction &&
-        address_detail.contracts_creation_internal_transaction.from_address_hash),
+      "creationTransaction" => prepare_creation_transaction(address_detail),
+      "creator" => prepare_creator(address_detail),
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
       "type" => get_address_type(contractName, address_detail)
     }
@@ -411,6 +409,30 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
         nil
       contract_method ->
         contract_method.abi["name"]
+    end
+  end
+
+  defp prepare_creation_transaction(address_detail) do
+    if is_nil(address_detail.contracts_creation_internal_transaction) do
+      to_string(address_detail.contracts_creation_transaction && address_detail.contracts_creation_transaction.hash)
+    else
+      to_string(
+        address_detail.contracts_creation_internal_transaction &&
+          address_detail.contracts_creation_internal_transaction.transaction_hash
+      )
+    end
+  end
+
+  defp prepare_creator(address_detail) do
+    if is_nil(address_detail.contracts_creation_internal_transaction) do
+      to_string(address_detail.contracts_creation_transaction &&
+        address_detail.contracts_creation_transaction.from_address_hash
+      )
+    else
+      to_string(
+        address_detail.contracts_creation_internal_transaction &&
+          address_detail.contracts_creation_internal_transaction.from_address_hash
+      )
     end
   end
 
