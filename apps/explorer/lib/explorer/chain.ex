@@ -5288,6 +5288,7 @@ defmodule Explorer.Chain do
   def fetch_last_token_balances(address_hash, paging_options) do
     address_hash
     |> CurrentTokenBalance.last_token_balances(paging_options)
+    |> preload(:token)
     |> page_current_token_balances(paging_options)
     |> Repo.all()
   end
