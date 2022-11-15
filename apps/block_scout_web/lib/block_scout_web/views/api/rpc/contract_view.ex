@@ -62,7 +62,7 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     contract_output = %{
       "Address" => to_string(address.hash),
       "DeployedByteCode" => to_string(address.contract_code),
-      "ContractCreationCode" => get_contract_creation_code(address),
+      "ContractCreationCode" => to_string(address.contracts_creation_transaction.input),
       "Verified" => address.verified,
       "VerifiedAt" => to_string(address.smart_contract && address.smart_contract.inserted_at)
     }
@@ -238,15 +238,4 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
 
   defp decompiler_version(nil), do: ""
   defp decompiler_version(%DecompiledSmartContract{decompiler_version: decompiler_version}), do: decompiler_version
-
-  defp get_contract_creation_code(address) do
-    if is_nil(address.contracts_creation_transaction) do
-      to_string(
-        address.contracts_creation_internal_transaction &&
-          address.contracts_creation_internal_transaction.input
-      )
-    else
-      to_string(address.contracts_creation_transaction.input)
-    end
-  end
 end
