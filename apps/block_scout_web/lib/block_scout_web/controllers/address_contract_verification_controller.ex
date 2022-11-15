@@ -6,11 +6,15 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
   alias Ecto.Changeset
   alias Explorer.Chain
   alias Explorer.Chain.Events.Publisher, as: EventsPublisher
+  alias Explorer.Chain.Hash.Address
   alias Explorer.Chain.SmartContract
+  alias Explorer.Chain.SmartContract.VerificationStatus
   alias Explorer.SmartContract.{CompilerVersion, Solidity.CodeCompiler}
   alias Explorer.SmartContract.Solidity.PublisherWorker, as: SolidityPublisherWorker
   alias Explorer.SmartContract.Vyper.PublisherWorker, as: VyperPublisherWorker
   alias Explorer.ThirdPartyIntegrations.Sourcify
+
+  require Logger
 
   def new(conn, %{"address_id" => address_hash_string}) do
     if Chain.smart_contract_fully_verified?(address_hash_string) do
@@ -71,9 +75,28 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
           "external_libraries" => external_libraries
         }
       ) do
-    Que.add(SolidityPublisherWorker, {"flattened", smart_contract, external_libraries, conn})
+    address_hash = smart_contract["address_hash"]
+    with {:ok, hash} <- validate_address_hash(address_hash),
+         :ok <- Chain.check_address_exists(hash),
+         {:contract, :not_found} <- {:contract, Chain.check_verified_smart_contract_exists(hash)},
+         uid <- VerificationStatus.generate_uid(address_hash) do
 
-    send_resp(conn, 204, "")
+      Que.add(SolidityPublisherWorker, {"flattened", smart_contract, external_libraries, uid})
+      send_resp(conn, :created, encode(%{guid: uid}))
+    else
+      :invalid_address ->
+        send_resp(conn, :unprocessable_entity, encode(%{error: "address_hash is invalid"}))
+
+      :not_found ->
+        send_resp(conn, :unprocessable_entity, encode(%{error: "address is not found"}))
+
+      {:contract, :ok} ->
+        send_resp(
+          conn,
+          :unprocessable_entity,
+          encode(%{error: "verified code already exists for this address"})
+        )
+    end
   end
 
   # sobelow_skip ["Traversal.FileModule"]
@@ -304,6 +327,17 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
       else
         {:error, :sourcify_disabled}
       end
+    end
+  end
+
+  defp encode(data) do
+    Jason.encode!(data)
+  end
+
+  defp validate_address_hash(address_hash) do
+    case Address.cast(address_hash) do
+      {:ok, hash} -> {:ok, hash}
+      :error -> :invalid_address
     end
   end
 end
