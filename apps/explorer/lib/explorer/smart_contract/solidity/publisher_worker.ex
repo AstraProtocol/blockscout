@@ -10,12 +10,15 @@ defmodule Explorer.SmartContract.Solidity.PublisherWorker do
   alias Explorer.SmartContract.Solidity.Publisher
 
   def perform({"flattened", %{"address_hash" => address_hash} = params, external_libraries, conn}) do
+    VerificationStatus.insert_status(conn, :pending, address_hash)
     result =
       case Publisher.publish(address_hash, params, external_libraries) do
         {:ok, _contract} = result ->
+          VerificationStatus.update_status(conn, :pass)
           result
 
         {:error, changeset} ->
+          VerificationStatus.update_status(conn, :fail)
           {:error, changeset}
       end
 
