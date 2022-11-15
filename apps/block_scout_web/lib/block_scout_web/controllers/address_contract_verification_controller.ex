@@ -73,10 +73,11 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
         %{
           "smart_contract" => smart_contract,
           "external_libraries" => external_libraries
-        }
+        } = params
       ) do
     address_hash = smart_contract["address_hash"]
-    with {:ok, hash} <- validate_address_hash(address_hash),
+    with {:params, {:ok, _}} <- {:params, fetch_verify_flattened_params(params)},
+         {:ok, hash} <- validate_address_hash(address_hash),
          :ok <- Chain.check_address_exists(hash),
          {:contract, :not_found} <- {:contract, Chain.check_verified_smart_contract_exists(hash)},
          uid <- VerificationStatus.generate_uid(address_hash) do
@@ -84,17 +85,20 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
       Que.add(SolidityPublisherWorker, {"flattened", smart_contract, external_libraries, uid})
       send_resp(conn, :created, encode(%{guid: uid}))
     else
+      {:params, {:error, error}} ->
+        send_resp(conn, :unprocessable_entity, encode(%{error: "Body params is invalid: #{error}"}))
+
       :invalid_address ->
-        send_resp(conn, :unprocessable_entity, encode(%{error: "address_hash is invalid"}))
+        send_resp(conn, :unprocessable_entity, encode(%{error: "Address hash is invalid"}))
 
       :not_found ->
-        send_resp(conn, :unprocessable_entity, encode(%{error: "address is not found"}))
+        send_resp(conn, :unprocessable_entity, encode(%{error: "Address is not found"}))
 
       {:contract, :ok} ->
         send_resp(
           conn,
           :unprocessable_entity,
-          encode(%{error: "verified code already exists for this address"})
+          encode(%{error: "Verified code already exists for this address"})
         )
     end
   end
@@ -338,6 +342,32 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
     case Address.cast(address_hash) do
       {:ok, hash} -> {:ok, hash}
       :error -> :invalid_address
+    end
+  end
+
+  defp fetch_verify_flattened_params(
+         %{
+           "smart_contract" => smart_contract,
+           "external_libraries" => _external_libraries
+         }
+       ) do
+    {:ok, %{}}
+    |> required_param(smart_contract, "address_hash", "addressHash")
+    |> required_param(smart_contract, "name", "name")
+    |> required_param(smart_contract, "compiler_version", "compilerVersion")
+    |> required_param(smart_contract, "optimization", "optimization")
+    |> required_param(smart_contract, "contract_source_code", "contractSourceCode")
+  end
+
+  defp required_param({:error, _} = error, _, _, _), do: error
+
+  defp required_param({:ok, map}, params, key, new_key) do
+    case Map.fetch(params, key) do
+      {:ok, value} ->
+        {:ok, Map.put(map, new_key, value)}
+
+      :error ->
+        {:error, "#{key} is required."}
     end
   end
 end
