@@ -357,6 +357,10 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
     |> required_param(smart_contract, "compiler_version", "compilerVersion")
     |> required_param(smart_contract, "optimization", "optimization")
     |> required_param(smart_contract, "contract_source_code", "contractSourceCode")
+    |> optional_param(smart_contract, "evm_version", "evmVersion")
+    |> optional_param(smart_contract, "constructor_arguments", "constructorArguments")
+    |> optional_param(smart_contract, "autodetect_constructor_args", "autodetectConstructorArguments")
+    |> optional_param(smart_contract, "optimization_runs", "optimizationRuns")
   end
 
   defp required_param({:error, _} = error, _, _, _), do: error
@@ -368,6 +372,18 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
 
       :error ->
         {:error, "#{key} is required."}
+    end
+  end
+
+  defp optional_param({:error, _} = error, _, _, _), do: error
+
+  defp optional_param({:ok, map}, params, key, new_key) do
+    case Map.fetch(params, key) do
+      {:ok, value} ->
+        {:ok, Map.put(map, new_key, value)}
+
+      :error ->
+        {:ok, map}
     end
   end
 end
