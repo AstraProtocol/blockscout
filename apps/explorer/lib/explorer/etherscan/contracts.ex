@@ -25,6 +25,8 @@ defmodule Explorer.Etherscan.Contracts do
           address_with_smart_contract =
             Repo.replica().preload(address, [
               :smart_contract,
+              :contracts_creation_transaction,
+              :contracts_creation_internal_transaction,
               :decompiled_smart_contracts,
               :smart_contract_additional_sources
             ])

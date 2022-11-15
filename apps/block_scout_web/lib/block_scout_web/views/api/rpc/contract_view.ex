@@ -60,7 +60,11 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     optimization = Map.get(contract, :optimization, "")
 
     contract_output = %{
-      "Address" => to_string(address.hash)
+      "Address" => to_string(address.hash),
+      "DeployedByteCode" => to_string(address.contract_code),
+      "ContractCreationCode" => to_string(address.contracts_creation_transaction.input),
+      "Verified" => address.verified,
+      "VerifiedAt" => to_string(address.smart_contract && address.smart_contract.inserted_at)
     }
 
     contract_output
