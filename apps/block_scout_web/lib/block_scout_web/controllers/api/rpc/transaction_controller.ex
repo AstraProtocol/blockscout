@@ -82,13 +82,9 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
     with {:txhash_param, {:ok, txhash_param}} <- fetch_txhash(params),
          {:format, {:ok, transaction_hash}} <- to_transaction_hash(txhash_param),
          {:transaction, {:ok, transaction}} <- transaction_from_hash(transaction_hash) do
-      with {:ok, contract} <- Chain.get_smart_contract_by_address_hash(transaction.to_address_hash) do
-        render(conn, :getabibytxhash, %{
-          abi: contract.abi}
-        )
-      else
-        {:error, :not_found} ->
-          case  Chain.get_contract_method_by_input_data(transaction.input) do
+      case transaction.to_address.smart_contract do
+        nil ->
+          case Chain.get_contract_method_by_input_data(transaction.input) do
             nil ->
               render(conn, :getabibytxhash, %{
                 abi: ""}
@@ -98,6 +94,14 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
                 abi: contract_method.abi}
               )
           end
+        smart_contract ->
+          full_abi = Chain.combine_proxy_implementation_abi(
+            smart_contract.address_hash,
+            smart_contract.abi
+          )
+          render(conn, :getabibytxhash, %{
+            abi: full_abi}
+          )
       end
     else
       {:txhash_param, :error} ->
@@ -233,6 +237,8 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
              [token_transfers: :to_address] => :optional,
              [token_transfers: :from_address] => :optional,
              [token_transfers: :token_contract_address] => :optional,
+             [to_address: :smart_contract] => :optional,
+             to_address: :required,
              block: :required
            }
          ) do
