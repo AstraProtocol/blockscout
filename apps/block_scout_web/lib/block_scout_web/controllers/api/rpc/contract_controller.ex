@@ -11,7 +11,7 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
   alias Explorer.Chain.SmartContract.VerificationStatus
   alias Explorer.Etherscan.Contracts
   alias Explorer.SmartContract.{Helper, CompilerVersion}
-  alias Explorer.SmartContract.Solidity.Publisher
+  alias Explorer.SmartContract.Solidity.{Publisher, CodeCompiler}
   alias Explorer.SmartContract.Solidity.PublisherWorker, as: SolidityPublisherWorker
   alias Explorer.SmartContract.Vyper.Publisher, as: VyperPublisher
   alias Explorer.ThirdPartyIntegrations.Sourcify
@@ -440,6 +440,10 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
       {:compiler_param, :error} ->
         render(conn, :error, error: @compiler_required)
     end
+  end
+
+  def getevmversions(conn, _params) do
+    render(conn, :getcompilerversions, %{versions: CodeCompiler.allowed_evm_versions()})
   end
 
   defp list_contracts(%{page_number: page_number, page_size: page_size} = opts) do
