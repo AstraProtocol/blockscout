@@ -22,10 +22,6 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     RPCView.render("show.json", data: [prepare_source_code_contract(contract)])
   end
 
-  def render("getcompilerversions.json", %{versions: versions}) do
-    RPCView.render("show.json", data: %{"versions" => versions})
-  end
-
   def render("error.json", assigns) do
     RPCView.render("error.json", assigns)
   end

@@ -10,8 +10,8 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
   alias Explorer.Chain.{Address, Hash, SmartContract}
   alias Explorer.Chain.SmartContract.VerificationStatus
   alias Explorer.Etherscan.Contracts
-  alias Explorer.SmartContract.{Helper, CompilerVersion}
-  alias Explorer.SmartContract.Solidity.{Publisher, CodeCompiler}
+  alias Explorer.SmartContract.Helper
+  alias Explorer.SmartContract.Solidity.Publisher
   alias Explorer.SmartContract.Solidity.PublisherWorker, as: SolidityPublisherWorker
   alias Explorer.SmartContract.Vyper.Publisher, as: VyperPublisher
   alias Explorer.ThirdPartyIntegrations.Sourcify
@@ -21,7 +21,6 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
   @invalid_address "Invalid address hash"
   @invalid_args "Invalid args format"
   @address_required "Query parameter address is required"
-  @compiler_required "Query parameter compiler is required"
 
   def verify(conn, %{"addressHash" => address_hash} = params) do
     with {:params, {:ok, fetched_params}} <- {:params, fetch_verify_params(params)},
@@ -416,36 +415,6 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
     end
   end
 
-  def getcompilerversions(conn, params) do
-    with {:compiler_param, {:ok, compiler_param}} <- fetch_compiler(params) do
-      case compiler_param do
-        "solc" ->
-          with {:ok, versions} <- CompilerVersion.fetch_versions(:solc) do
-            render(conn, :getcompilerversions, %{versions: versions})
-          else
-            {:error, reason} ->
-              render(conn, :error, error: reason)
-          end
-        "vyper" ->
-          with {:ok, versions} <- CompilerVersion.fetch_versions(:vyper) do
-            render(conn, :getcompilerversions, %{versions: versions})
-          else
-            {:error, reason} ->
-              render(conn, :error, error: reason)
-          end
-        _ ->
-          render(conn, :error, error: "Invalid compiler")
-      end
-    else
-      {:compiler_param, :error} ->
-        render(conn, :error, error: @compiler_required)
-    end
-  end
-
-  def getevmversions(conn, _params) do
-    render(conn, :getcompilerversions, %{versions: CodeCompiler.allowed_evm_versions()})
-  end
-
   defp list_contracts(%{page_number: page_number, page_size: page_size} = opts) do
     offset = (max(page_number, 1) - 1) * page_size
 
@@ -527,10 +496,6 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
 
   defp fetch_address(params) do
     {:address_param, Map.fetch(params, "address")}
-  end
-
-  defp fetch_compiler(params) do
-    {:compiler_param, Map.fetch(params, "compiler")}
   end
 
   defp to_address_hash(address_hash_string) do
