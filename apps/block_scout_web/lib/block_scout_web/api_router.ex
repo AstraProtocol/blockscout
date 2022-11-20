@@ -153,10 +153,13 @@ defmodule BlockScoutWeb.ApiRouter do
     alias BlockScoutWeb.API.V1.CountedInfoController
     alias BlockScoutWeb.API.V1.MarketHistoryChartApiController
     alias BlockScoutWeb.API.V1.TransactionHistoryChartApiController
+    alias BlockScoutWeb.API.V1.CompilerController
 
     # leave the same endpoint in v1 in order to keep backward compatibility
     get("/search", SearchController, :search)
     get("/health", HealthController, :health)
+    get("/compiler-versions", CompilerController, :getcompilerversions)
+    get("/evm-versions", CompilerController, :getevmversions)
     get("/common-stats", CommonStatsController, :common_stats)
     get("/estimate-counted-info", CountedInfoController, :counted_info)
     get("/gas-price-oracle", V1.GasPriceOracleController, :gas_price_oracle)
