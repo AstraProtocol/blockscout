@@ -1,6 +1,6 @@
 import $ from 'jquery'
 import { Chart, Filler, LineController, LineElement, PointElement, LinearScale, TimeScale, Title, Tooltip } from 'chart.js'
-import 'chartjs-adapter-moment'
+import 'chartjs-adapter-luxon'
 import humps from 'humps'
 
 Chart.defaults.font.family = 'Nunito, "Helvetica Neue", Arial, sans-serif,"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"'
@@ -56,8 +56,8 @@ export function createCoinBalanceHistoryChart (el) {
               type: 'time',
               time: {
                 unit: 'day',
-                tooltipFormat: 'YYYY-MM-DD',
-                stepSize: stepSize
+                tooltipFormat: 'DD',
+                stepSize
               }
             },
             y: {
@@ -67,7 +67,7 @@ export function createCoinBalanceHistoryChart (el) {
               },
               title: {
                 display: true,
-                labelString: window.localized.Ether
+                labelString: window.localized.Astra
               }
             }
           }

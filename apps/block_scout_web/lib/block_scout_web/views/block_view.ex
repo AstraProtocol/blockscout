@@ -3,10 +3,11 @@ defmodule BlockScoutWeb.BlockView do
 
   import Math.Enum, only: [mean: 1]
 
+  alias Ecto.Association.NotLoaded
   alias Explorer.Chain
   alias Explorer.Chain.{Block, Wei}
   alias Explorer.Chain.Block.Reward
-  alias Explorer.Counters.{BlockBurnedFeeCounter, BlockPriorityFeeCounter}
+  alias Explorer.Counters.BlockPriorityFeeCounter
 
   @dialyzer :no_match
 
@@ -18,11 +19,12 @@ defmodule BlockScoutWeb.BlockView do
       |> Kernel.||(0)
       |> BlockScoutWeb.Cldr.Number.to_string!()
 
-    unit_text = gettext("MicroAstra")
+    unit_text = gettext("NanoAstra")
 
     "#{average} #{unit_text}"
   end
 
+  def block_type(%Block{consensus: false, nephews: %NotLoaded{}}), do: "Reorg"
   def block_type(%Block{consensus: false, nephews: []}), do: "Reorg"
   def block_type(%Block{consensus: false}), do: "Uncle"
   def block_type(_block), do: "Block"
@@ -58,12 +60,12 @@ defmodule BlockScoutWeb.BlockView do
       %{payout_key: block_miner_payout_address} = Reward.get_validator_payout_key_by_mining(block_miner_address)
 
       if beneficiary_address == block_miner_payout_address do
-        gettext("Miner Reward")
+        gettext("Proposer Reward")
       else
         gettext("Chore Reward")
       end
     else
-      gettext("Miner Reward")
+      gettext("Proposer Reward")
     end
   end
 

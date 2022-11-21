@@ -30,6 +30,10 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     RPCView.render("show.json", data: prepare_source_code_contract(contract))
   end
 
+  def render("show.json", %{result: result}) do
+    RPCView.render("show.json", data: result)
+  end
+
   defp prepare_source_code_contract(nil) do
     %{
       "Address" => "",
@@ -44,7 +48,8 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
       "EVMVersion" => "",
       "ConstructorArguments" => "",
       "ExternalLibraries" => "",
-      "FileName" => ""
+      "FileName" => "",
+      "IsProxy" => "false"
     }
   end
 
@@ -55,7 +60,11 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     optimization = Map.get(contract, :optimization, "")
 
     contract_output = %{
-      "Address" => to_string(address.hash)
+      "Address" => to_string(address.hash),
+      "DeployedByteCode" => to_string(address.contract_code),
+      "ContractCreationCode" => get_contract_creation_code(address),
+      "Verified" => address.verified,
+      "VerifiedAt" => to_string(address.smart_contract && address.smart_contract.inserted_at)
     }
 
     contract_output
@@ -64,6 +73,26 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     |> set_constructor_arguments(contract)
     |> set_external_libraries(contract)
     |> set_verified_contract_data(contract, address, optimization)
+    |> set_proxy_info(contract)
+  end
+
+  defp set_proxy_info(contract_output, contract) when contract == %{} do
+    contract_output
+  end
+
+  defp set_proxy_info(contract_output, contract) do
+    result =
+      if contract.is_proxy do
+        contract_output
+        |> Map.put_new(:ImplementationAddress, contract.implementation_address_hash_string)
+      else
+        contract_output
+      end
+
+    is_proxy_string = if contract.is_proxy, do: "true", else: "false"
+
+    result
+    |> Map.put_new(:IsProxy, is_proxy_string)
   end
 
   defp set_decompiled_contract_data(contract_output, decompiled_smart_contract) do
@@ -209,4 +238,15 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
 
   defp decompiler_version(nil), do: ""
   defp decompiler_version(%DecompiledSmartContract{decompiler_version: decompiler_version}), do: decompiler_version
+
+  defp get_contract_creation_code(address) do
+    if is_nil(address.contracts_creation_transaction) do
+      to_string(
+        address.contracts_creation_internal_transaction &&
+          address.contracts_creation_internal_transaction.input
+      )
+    else
+      to_string(address.contracts_creation_transaction.input)
+    end
+  end
 end

@@ -9,6 +9,7 @@ defmodule Explorer.Chain.Transaction do
 
   alias ABI.FunctionSelector
 
+  alias Ecto.Association.NotLoaded
   alias Ecto.Changeset
 
   alias Explorer.{Chain, Repo}
@@ -30,12 +31,9 @@ defmodule Explorer.Chain.Transaction do
   alias Explorer.Chain.Transaction.{Fork, Status}
 
   @optional_attrs ~w(max_priority_fee_per_gas max_fee_per_gas block_hash block_number created_contract_address_hash cumulative_gas_used earliest_processing_start
-                     error gas_used index created_contract_code_indexed_at status
-                     to_address_hash revert_reason)a
+                     error gas_used index created_contract_code_indexed_at status to_address_hash revert_reason type has_error_in_internal_txs cosmos_hash)a
 
   @required_attrs ~w(from_address_hash gas gas_price hash input nonce r s v value)a
-
-  @required_attrs_for_1559 ~w(type)a
 
   @typedoc """
   X coordinate module n in
@@ -137,6 +135,7 @@ defmodule Explorer.Chain.Transaction do
    * `max_priority_fee_per_gas` - User defined maximum fee (tip) per unit of gas paid to validator for transaction prioritization.
    * `max_fee_per_gas` - Maximum total amount per unit of gas a user is willing to pay for a transaction, including base fee and priority fee.
    * `type` - New transaction type identifier introduced in EIP 2718 (Berlin HF)
+   * `has_error_in_internal_txs` - shows if the internal transactions related to transaction have errors
   """
   @type t :: %__MODULE__{
           block: %Ecto.Association.NotLoaded{} | Block.t() | nil,
@@ -155,6 +154,7 @@ defmodule Explorer.Chain.Transaction do
           gas_price: wei_per_gas,
           gas_used: Gas.t() | nil,
           hash: Hash.t(),
+          cosmos_hash: String.t() | nil,
           index: transaction_index | nil,
           input: Data.t(),
           internal_transactions: %Ecto.Association.NotLoaded{} | [InternalTransaction.t()],
@@ -168,10 +168,11 @@ defmodule Explorer.Chain.Transaction do
           uncles: %Ecto.Association.NotLoaded{} | [Block.t()],
           v: v(),
           value: Wei.t(),
-          revert_reason: String.t(),
+          revert_reason: String.t() | nil,
           max_priority_fee_per_gas: wei_per_gas | nil,
           max_fee_per_gas: wei_per_gas | nil,
-          type: non_neg_integer() | nil
+          type: non_neg_integer() | nil,
+          has_error_in_internal_txs: boolean()
         }
 
   @derive {Poison.Encoder,
@@ -223,6 +224,7 @@ defmodule Explorer.Chain.Transaction do
     field(:gas, :decimal)
     field(:gas_price, Wei)
     field(:gas_used, :decimal)
+    field(:cosmos_hash, :string)
     field(:index, :integer)
     field(:created_contract_code_indexed_at, :utc_datetime_usec)
     field(:input, Data)
@@ -236,6 +238,7 @@ defmodule Explorer.Chain.Transaction do
     field(:max_priority_fee_per_gas, Wei)
     field(:max_fee_per_gas, Wei)
     field(:type, :integer)
+    field(:has_error_in_internal_txs, :boolean)
 
     # A transient field for deriving old block hash during transaction upserts.
     # Used to force refetch of a block in case a transaction is re-collated
@@ -409,18 +412,11 @@ defmodule Explorer.Chain.Transaction do
 
   """
   def changeset(%__MODULE__{} = transaction, attrs \\ %{}) do
-    enabled_1559 = Application.get_env(:explorer, :enabled_1559_support)
-
-    required_attrs = if enabled_1559, do: @required_attrs ++ @required_attrs_for_1559, else: @required_attrs
-
-    attrs_to_cast =
-      if enabled_1559,
-        do: @required_attrs ++ @required_attrs_for_1559 ++ @optional_attrs,
-        else: @required_attrs ++ @optional_attrs
+    attrs_to_cast = @required_attrs ++ @optional_attrs
 
     transaction
     |> cast(attrs, attrs_to_cast)
-    |> validate_required(required_attrs)
+    |> validate_required(@required_attrs)
     |> validate_collated()
     |> validate_error()
     |> validate_status()
@@ -431,6 +427,20 @@ defmodule Explorer.Chain.Transaction do
     |> unique_constraint(:hash)
   end
 
+  def update_error_in_internal_txs(hash) do
+    case Hash.Full.cast(hash) do
+      {:ok, tx_hash} ->
+        schema = Repo.get_by(Transaction, [hash: tx_hash])
+        if is_nil(schema) == false and is_nil(schema.has_error_in_internal_txs) do
+          change(schema, %{has_error_in_internal_txs: true}) |> Repo.update()
+        else
+          {:error, nil}
+        end
+      _ ->
+        {:error, nil}
+    end
+  end
+
   def preload_token_transfers(query, address_hash) do
     token_transfers_query =
       from(
@@ -438,16 +448,50 @@ defmodule Explorer.Chain.Transaction do
         where:
           tt.token_contract_address_hash == ^address_hash or tt.to_address_hash == ^address_hash or
             tt.from_address_hash == ^address_hash,
+        order_by: [asc: tt.log_index],
         preload: [:token, [from_address: :names], [to_address: :names]]
       )
 
     preload(query, [tt], token_transfers: ^token_transfers_query)
   end
 
+  def decoded_revert_reason(transaction, revert_reason) do
+    case revert_reason do
+      "0x" <> hex_part ->
+        proccess_hex_revert_reason(hex_part, transaction)
+
+      hex_part ->
+        proccess_hex_revert_reason(hex_part, transaction)
+    end
+  end
+
+  defp proccess_hex_revert_reason(hex_revert_reason, %__MODULE__{to_address: smart_contract, hash: hash}) do
+    case Integer.parse(hex_revert_reason, 16) do
+      {number, ""} ->
+        binary_revert_reason = :binary.encode_unsigned(number)
+        decoded_input_data(%Transaction{to_address: smart_contract, hash: hash, input: %{bytes: binary_revert_reason}})
+
+      _ ->
+        hex_revert_reason
+    end
+  end
+
   # Because there is no contract association, we know the contract was not verified
   def decoded_input_data(%__MODULE__{to_address: nil}), do: {:error, :no_to_address}
   def decoded_input_data(%__MODULE__{input: %{bytes: bytes}}) when bytes in [nil, <<>>], do: {:error, :no_input_data}
   def decoded_input_data(%__MODULE__{to_address: %{contract_code: nil}}), do: {:error, :not_a_contract_call}
+
+  def decoded_input_data(%__MODULE__{
+        to_address: %{smart_contract: %NotLoaded{}},
+        input: input,
+        hash: hash
+      }) do
+    decoded_input_data(%__MODULE__{
+      to_address: %{smart_contract: nil},
+      input: input,
+      hash: hash
+    })
+  end
 
   def decoded_input_data(%__MODULE__{
         to_address: %{smart_contract: nil},
@@ -483,7 +527,27 @@ defmodule Explorer.Chain.Transaction do
         to_address: %{smart_contract: %{abi: abi, address_hash: address_hash}},
         hash: hash
       }) do
-    do_decoded_input_data(data, abi, address_hash, hash)
+    case do_decoded_input_data(data, abi, address_hash, hash) do
+      # In some cases transactions use methods of some unpredictable contracts, so we can try to look up for method in a whole DB
+      {:error, :could_not_decode} ->
+        case decoded_input_data(%__MODULE__{
+               to_address: %{smart_contract: nil},
+               input: %{bytes: data},
+               hash: hash
+             }) do
+          {:error, :contract_not_verified, []} ->
+            {:error, :could_not_decode}
+
+          {:error, :contract_not_verified, candidates} ->
+            {:error, :contract_verified, candidates}
+
+          _ ->
+            {:error, :could_not_decode}
+        end
+
+      output ->
+        output
+    end
   end
 
   defp do_decoded_input_data(data, abi, address_hash, hash) do
@@ -523,14 +587,16 @@ defmodule Explorer.Chain.Transaction do
 
   def get_method_name(_), do: "Transfer"
 
-  defp parse_method_name(method_desc) do
+  def parse_method_name(method_desc, need_upcase \\ true) do
     method_desc
     |> String.split("(")
     |> Enum.at(0)
-    |> upcase_first
+    |> upcase_first(need_upcase)
   end
 
-  defp upcase_first(<<first::utf8, rest::binary>>), do: String.upcase(<<first::utf8>>) <> rest
+  defp upcase_first(string, false), do: string
+
+  defp upcase_first(<<first::utf8, rest::binary>>, true), do: String.upcase(<<first::utf8>>) <> rest
 
   defp function_call(name, mapping) do
     text =

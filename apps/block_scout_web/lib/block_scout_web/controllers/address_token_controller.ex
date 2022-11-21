@@ -2,6 +2,8 @@ defmodule BlockScoutWeb.AddressTokenController do
   use BlockScoutWeb, :controller
 
   import BlockScoutWeb.Chain, only: [next_page_params: 3, paging_options: 1, split_list_by_page: 1]
+  import BlockScoutWeb.Account.AuthController, only: [current_user: 1]
+  import BlockScoutWeb.Models.GetAddressTags, only: [get_address_tags: 2]
 
   alias BlockScoutWeb.{AccessHelpers, AddressTokenView, Controller}
   alias Explorer.{Chain, Market}
@@ -14,8 +16,12 @@ defmodule BlockScoutWeb.AddressTokenController do
     with {:ok, address_hash} <- Chain.string_to_address_hash(address_hash_string),
          {:ok, address} <- Chain.hash_to_address(address_hash, [], false),
          {:ok, false} <- AccessHelpers.restricted_access?(address_hash_string, params) do
-      tokens_plus_one = Chain.address_tokens_with_balance(address_hash, paging_options(params))
-      {tokens, next_page} = split_list_by_page(tokens_plus_one)
+      token_balances_plus_one =
+        address_hash
+        |> Chain.fetch_last_token_balances(paging_options(params))
+        |> Market.add_price()
+
+      {tokens, next_page} = split_list_by_page(token_balances_plus_one)
 
       next_page_path =
         case next_page_params(next_page, tokens, params) do
@@ -29,10 +35,11 @@ defmodule BlockScoutWeb.AddressTokenController do
       items =
         tokens
         |> Market.add_price()
-        |> Enum.map(fn token ->
+        |> Enum.map(fn {token_balance, token} ->
           View.render_to_string(
             AddressTokenView,
             "_tokens.html",
+            token_balance: token_balance,
             token: token,
             address: address,
             conn: conn
@@ -69,7 +76,8 @@ defmodule BlockScoutWeb.AddressTokenController do
         current_path: Controller.current_full_path(conn),
         coin_balance_status: CoinBalanceOnDemand.trigger_fetch(address),
         exchange_rate: Market.get_exchange_rate(Explorer.coin()) || Token.null(),
-        counters_path: address_path(conn, :address_counters, %{"id" => Address.checksum(address_hash)})
+        counters_path: address_path(conn, :address_counters, %{"id" => Address.checksum(address_hash)}),
+        tags: get_address_tags(address_hash, current_user(conn))
       )
     else
       {:restricted_access, _} ->

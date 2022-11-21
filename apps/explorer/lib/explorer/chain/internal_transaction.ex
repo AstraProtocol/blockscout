@@ -253,7 +253,7 @@ defmodule Explorer.Chain.InternalTransaction do
       true
 
   Failed `:call`s are not allowed to set `gas_used` or `output` because they are part of the successful `result` object
-  in the Parity JSONRPC response.  They still need `input`, however.
+  in the Nethermind JSONRPC response.  They still need `input`, however.
 
       iex> changeset = Explorer.Chain.InternalTransaction.changeset(
       ...>   %Explorer.Chain.InternalTransaction{},
@@ -315,7 +315,7 @@ defmodule Explorer.Chain.InternalTransaction do
       ]
 
   For failed `:create`, `created_contract_code`, `created_contract_address_hash`, and `gas_used` are not allowed to be
-  set because they come from `result` object, which shouldn't be returned from Parity.
+  set because they come from `result` object, which shouldn't be returned from Nethermind.
 
       iex> changeset = Explorer.Chain.InternalTransaction.changeset(
       ...>   %Explorer.Chain.InternalTransaction{},
@@ -572,6 +572,38 @@ defmodule Explorer.Chain.InternalTransaction do
       query,
       [it],
       (it.type == ^:call and it.index > 0) or it.type != ^:call
+    )
+  end
+
+  def where_block_number_in_period(query, from_number, to_number) when is_nil(from_number) and not is_nil(to_number) do
+    where(
+      query,
+      [it],
+      it.block_number <= ^to_number
+    )
+  end
+
+  def where_block_number_in_period(query, from_number, to_number) when not is_nil(from_number) and is_nil(to_number) do
+    where(
+      query,
+      [it],
+      it.block_number > ^from_number
+    )
+  end
+
+  def where_block_number_in_period(query, from_number, to_number) when is_nil(from_number) and is_nil(to_number) do
+    where(
+      query,
+      [it],
+      1
+    )
+  end
+
+  def where_block_number_in_period(query, from_number, to_number) do
+    where(
+      query,
+      [it],
+      it.block_number > ^from_number and it.block_number <= ^to_number
     )
   end
 

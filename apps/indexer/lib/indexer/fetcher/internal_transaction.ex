@@ -16,12 +16,13 @@ defmodule Indexer.Fetcher.InternalTransaction do
   alias Explorer.Chain.Block
   alias Explorer.Chain.Cache.{Accounts, Blocks}
   alias Indexer.{BufferedTask, Tracer}
+  alias Indexer.Fetcher.InternalTransaction.Supervisor, as: InternalTransactionSupervisor
   alias Indexer.Transform.Addresses
 
   @behaviour BufferedTask
 
-  @max_batch_size 10
-  @max_concurrency 4
+  @max_batch_size 7
+  @max_concurrency 3
   @defaults [
     flush_interval: :timer.seconds(3),
     max_concurrency: @max_concurrency,
@@ -49,7 +50,11 @@ defmodule Indexer.Fetcher.InternalTransaction do
   """
   @spec async_fetch([Block.block_number()]) :: :ok
   def async_fetch(block_numbers, timeout \\ 5000) when is_list(block_numbers) do
-    BufferedTask.buffer(__MODULE__, block_numbers, timeout)
+    if InternalTransactionSupervisor.disabled?() do
+      :ok
+    else
+      BufferedTask.buffer(__MODULE__, block_numbers, timeout)
+    end
   end
 
   @doc false
@@ -80,8 +85,10 @@ defmodule Indexer.Fetcher.InternalTransaction do
     final
   end
 
-  defp params(%{block_number: block_number, hash: hash, index: index}) when is_integer(block_number) do
-    %{block_number: block_number, hash_data: to_string(hash), transaction_index: index}
+  defp params(%{block_number: block_number, hash: hash, index: index,
+                input: input, has_error_in_internal_txs: has_error_in_internal_txs}) when is_integer(block_number) do
+    %{block_number: block_number, hash_data: to_string(hash), transaction_index: index,
+      input: Explorer.Chain.Data.to_string(input), has_error_in_internal_txs: has_error_in_internal_txs}
   end
 
   @impl BufferedTask
@@ -93,24 +100,28 @@ defmodule Indexer.Fetcher.InternalTransaction do
             )
   def run(block_numbers, json_rpc_named_arguments) do
     unique_numbers = Enum.uniq(block_numbers)
+    filtered_unique_numbers = EthereumJSONRPC.block_numbers_in_range(unique_numbers)
 
-    unique_numbers_count = Enum.count(unique_numbers)
-    Logger.metadata(count: unique_numbers_count)
+    filtered_unique_numbers_count = Enum.count(filtered_unique_numbers)
+    Logger.metadata(count: filtered_unique_numbers_count)
 
     Logger.debug("fetching internal transactions for blocks")
 
     json_rpc_named_arguments
     |> Keyword.fetch!(:variant)
     |> case do
-      EthereumJSONRPC.Parity ->
-        EthereumJSONRPC.fetch_block_internal_transactions(unique_numbers, json_rpc_named_arguments)
+      EthereumJSONRPC.Nethermind ->
+        EthereumJSONRPC.fetch_block_internal_transactions(filtered_unique_numbers, json_rpc_named_arguments)
+
+      EthereumJSONRPC.Erigon ->
+        EthereumJSONRPC.fetch_block_internal_transactions(filtered_unique_numbers, json_rpc_named_arguments)
 
       EthereumJSONRPC.Besu ->
-        EthereumJSONRPC.fetch_block_internal_transactions(unique_numbers, json_rpc_named_arguments)
+        EthereumJSONRPC.fetch_block_internal_transactions(filtered_unique_numbers, json_rpc_named_arguments)
 
       _ ->
         try do
-          fetch_block_internal_transactions_by_transactions(unique_numbers, json_rpc_named_arguments)
+          fetch_block_internal_transactions_by_transactions(filtered_unique_numbers, json_rpc_named_arguments)
         rescue
           error ->
             {:error, error}
@@ -118,15 +129,22 @@ defmodule Indexer.Fetcher.InternalTransaction do
     end
     |> case do
       {:ok, internal_transactions_params} ->
-        import_internal_transaction(internal_transactions_params, unique_numbers)
+        import_internal_transaction(internal_transactions_params, filtered_unique_numbers)
 
       {:error, reason} ->
         Logger.error(fn -> ["failed to fetch internal transactions for blocks: ", inspect(reason)] end,
-          error_count: unique_numbers_count
+          error_count: filtered_unique_numbers_count
         )
+        try do
+          tx_hash = Enum.at(reason, 0)[:data][:transaction_hash]
+          Chain.update_txs_has_error_in_internal_txs(tx_hash)
+        rescue
+          _ ->
+            :ok
+        end
 
         # re-queue the de-duped entries
-        {:retry, unique_numbers}
+        {:retry, filtered_unique_numbers}
 
       :ignore ->
         :ok
@@ -154,19 +172,68 @@ defmodule Indexer.Fetcher.InternalTransaction do
     end
   end
 
+  defp blank_input?(str) do
+    case str do
+      nil -> true
+      "0x" -> true
+      "" -> true
+      " " <> r -> blank_input?(r)
+      _ -> false
+    end
+  end
+
+  defp valid_param?(param) do
+    cond do
+      blank_input?(param[:input]) == true ->
+        false
+      !is_nil(param[:has_error_in_internal_txs]) ->
+        false
+      true ->
+        true
+    end
+  end
+
   defp fetch_block_internal_transactions_by_transactions(unique_numbers, json_rpc_named_arguments) do
     Enum.reduce(unique_numbers, {:ok, []}, fn
       block_number, {:ok, acc_list} ->
-        block_number
-        |> Chain.get_transactions_of_block_number()
-        |> Enum.map(&params(&1))
-        |> case do
+        transactions = block_number
+                       |> Chain.get_transactions_of_block_number()
+                       |> Enum.map(&params(&1))
+                       |> Enum.filter(fn param -> valid_param?(param) end)
+                       |> Enum.map(fn param ->
+          %{block_number: param[:block_number], hash_data: param[:hash_data],
+            transaction_index: param[:transaction_index]}
+          end)
+        case transactions do
           [] ->
             {:ok, []}
 
           transactions ->
+            pid = self() |> :erlang.pid_to_list() |> to_string() |> String.split(".")
+                  |> Enum.at(1) |> Integer.parse() |> elem(0)
+            max_process = @max_concurrency
+            max_handle_txs = @max_batch_size
             try do
-              EthereumJSONRPC.fetch_internal_transactions(transactions, json_rpc_named_arguments)
+              cond do
+                length(transactions) <= max_handle_txs ->
+                  EthereumJSONRPC.fetch_internal_transactions(
+                    transactions, json_rpc_named_arguments
+                  )
+                true ->
+                  start_index = rem(pid, max_process) * max_handle_txs
+                  cond do
+                    start_index >= length(transactions) ->
+                      Logger.info(
+                        "block_number: #{block_number}, total transactions: #{length(transactions)},
+                        start_index: #{start_index} is out of range"
+                      )
+                      {:ok, []}
+                    true ->
+                      EthereumJSONRPC.fetch_internal_transactions(
+                        Enum.slice(transactions, start_index, start_index + max_handle_txs - 1), json_rpc_named_arguments
+                      )
+                  end
+              end
             catch
               :exit, error ->
                 {:error, error}

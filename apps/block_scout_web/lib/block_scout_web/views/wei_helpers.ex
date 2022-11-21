@@ -32,7 +32,7 @@ defmodule BlockScoutWeb.WeiHelpers do
       "1 PicoAstra"
 
       iex> format_wei_value(%Wei{value: Decimal.new(1, 10, 12)}, :gwei)
-      "10,000 MicroAstra"
+      "10,000 NanoAstra"
 
       iex> format_wei_value(%Wei{value: Decimal.new(1, 10, 21)}, :ether)
       "10,000 Astra"
@@ -59,7 +59,7 @@ defmodule BlockScoutWeb.WeiHelpers do
       |> Wei.to(unit)
 
     formatted_value =
-      if Decimal.cmp(converted_value, 1_000_000_000_000) == :gt do
+      if Decimal.compare(converted_value, 1_000_000_000_000) == :gt do
         CldrHelper.Number.to_string!(converted_value, format: "0.###E+0")
       else
         CldrHelper.Number.to_string!(converted_value, format: "#,##0.##################")
@@ -74,6 +74,6 @@ defmodule BlockScoutWeb.WeiHelpers do
   end
 
   defp display_unit(:wei), do: gettext("PicoAstra")
-  defp display_unit(:gwei), do: gettext("MicroAstra")
+  defp display_unit(:gwei), do: gettext("NanoAstra")
   defp display_unit(:ether), do: gettext("Astra")
 end

@@ -34,11 +34,6 @@ ARG WOBSERVER_ENABLED
 ARG ADMIN_PANEL_ENABLED
 ARG CACHE_ADDRESS_WITH_BALANCES_UPDATE_INTERVAL
 ARG SOCKET_ROOT
-ARG CHAIN_ID
-ARG JSON_RPC
-ARG SUBNETWORK
-ARG COIN_NAME
-ARG COIN
 
 # Cache elixir deps
 ADD mix.exs mix.lock ./
@@ -53,22 +48,14 @@ ADD . .
 
 COPY . .
 
-RUN if [ "$COIN" != "" ]; then \
-        sed -i s/"POA"/"${COIN}"/g apps/block_scout_web/priv/gettext/en/LC_MESSAGES/default.po; \
-        sed -i "/msgid \"Ether\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/default.pot; \
-        sed -i "/msgid \"Ether\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/en/LC_MESSAGES/default.po; \
-        sed -i "/msgid \"ETH\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/default.pot; \
-        sed -i "/msgid \"ETH\"/{n;s/msgstr \"\"/msgstr \"${COIN}\"/g}" apps/block_scout_web/priv/gettext/en/LC_MESSAGES/default.po; \
-    fi
-
 # Run forderground build and phoenix digest
 RUN mix compile && npm install npm@latest
 
 # Add blockscout npm deps
 RUN cd apps/block_scout_web/assets/ && \
     npm install && \
-    npm run deploy && \
-    cd /app/apps/explorer/ && \
+    npm run deploy
+RUN cd /app/apps/explorer/ && \
     npm install && \
     apk update && \
     apk del --force-broken-world alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3
@@ -80,9 +67,11 @@ RUN mkdir -p /opt/release \
   && mv _build/${MIX_ENV}/rel/blockscout /opt/release
 
 ##############################################################
-FROM bitwalker/alpine-elixir-phoenix:1.13
+#FROM bitwalker/alpine-elixir-phoenix:1.13
 
-WORKDIR /app
+#WORKDIR /app
 
-COPY --from=builder /opt/release/blockscout .
-COPY --from=builder /app/apps/explorer/node_modules ./node_modules
+#COPY --from=builder /opt/release/blockscout .
+#COPY --from=builder /app/apps/explorer/node_modules ./node_modules
+
+CMD ["mix", "phx.server"]

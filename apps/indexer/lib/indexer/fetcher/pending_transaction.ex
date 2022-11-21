@@ -18,10 +18,10 @@ defmodule Indexer.Fetcher.PendingTransaction do
   alias Indexer.Fetcher.PendingTransaction
   alias Indexer.Transform.Addresses
 
-  @chunk_size 250
+  @chunk_size 50
 
   # milliseconds
-  @default_interval 1_000
+  @default_interval 2_000
 
   defstruct interval: @default_interval,
             json_rpc_named_arguments: [],
@@ -136,8 +136,28 @@ defmodule Indexer.Fetcher.PendingTransaction do
 
         :ok
 
+      {:error, :etimedout} ->
+        Logger.error("timeout")
+
+        :ok
+
+      {:error, :econnrefused} ->
+        Logger.error("connection_refused")
+
+        :ok
+
       {:error, {:bad_gateway, _}} ->
         Logger.error("bad_gateway")
+
+        :ok
+
+      {:error, :closed} ->
+        Logger.error("closed")
+
+        :ok
+
+      {:error, reason} ->
+        Logger.error(inspect(reason))
 
         :ok
     end
