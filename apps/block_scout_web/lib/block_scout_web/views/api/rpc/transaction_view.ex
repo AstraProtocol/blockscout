@@ -12,8 +12,8 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
     RPCView.render("show.json", data: data)
   end
 
-  def render("getabibytxhash.json", %{abi: abi}) do
-    RPCView.render("show.json", data: %{"abi" => abi})
+  def render("getabibytxhash.json", %{abi: abi, verified: verified}) do
+    RPCView.render("show.json", data: %{"abi" => abi, "verified" => verified})
   end
 
   def render("getrawtracebytxhash.json", %{raw_trace: raw_trace}) do

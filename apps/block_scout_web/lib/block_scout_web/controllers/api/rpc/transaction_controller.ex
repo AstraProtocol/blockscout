@@ -87,11 +87,11 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
           case Chain.get_contract_method_by_input_data(transaction.input) do
             nil ->
               render(conn, :getabibytxhash, %{
-                abi: ""}
+                abi: "", verified: false}
               )
             contract_method ->
               render(conn, :getabibytxhash, %{
-                abi: contract_method.abi}
+                abi: contract_method.abi, verified: false}
               )
           end
         smart_contract ->
@@ -100,7 +100,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
             smart_contract.abi
           )
           render(conn, :getabibytxhash, %{
-            abi: full_abi}
+            abi: full_abi, verified: true}
           )
       end
     else
