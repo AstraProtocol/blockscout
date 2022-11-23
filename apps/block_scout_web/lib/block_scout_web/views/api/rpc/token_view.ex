@@ -90,10 +90,19 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
 
   defp prepare_unique_tokens(unique_token) do
     %{
-      "tokenId" => "#{unique_token.instance.token_id}",
+      "tokenId" => "#{unique_token.token_id}",
       "ownerAddress" => to_string(unique_token.to_address_hash),
-      "metadata" => unique_token.instance.metadata
+      "metadata" => prepare_metadata(unique_token)
     }
+  end
+
+  defp prepare_metadata(unique_token) do
+    case unique_token.instance do
+      nil ->
+        nil
+      _ ->
+        unique_token.instance.metadata
+    end
   end
 
   defp prepare_token_transfer(token_transfer) do
