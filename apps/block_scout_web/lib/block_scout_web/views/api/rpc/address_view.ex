@@ -11,7 +11,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     RPCView.render("show.json", data: accounts)
   end
 
-  def render("getaddress.json", %{address_detail: address_detail}) do
+  def render("getaddress.json", %{address_detail: address_detail, verified: verified}) do
     contractName = prepare_address_name(address_detail)
     creationTransaction = prepare_creation_transaction(address_detail)
     creator = prepare_creator(address_detail)
@@ -23,7 +23,8 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "creationTransaction" => creationTransaction,
       "creator" => creator,
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
-      "type" => get_address_type(creator)
+      "type" => get_address_type(creator),
+      "verified" => verified
     }
     RPCView.render("show.json", data: data)
   end
