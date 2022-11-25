@@ -255,8 +255,6 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
              [to_address: :smart_contract] => :optional,
              [to_address: :names] => :optional,
              [from_address: :names] => :optional,
-             to_address: :required,
-             from_address: :required,
              block: :required
            }
          ) do
@@ -277,8 +275,6 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
              [to_address: :smart_contract] => :optional,
              [to_address: :names] => :optional,
              [from_address: :names] => :optional,
-             to_address: :required,
-             from_address: :required,
              block: :required
            }
          ) do
