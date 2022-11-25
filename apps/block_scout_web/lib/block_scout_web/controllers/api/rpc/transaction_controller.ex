@@ -82,26 +82,41 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
     with {:txhash_param, {:ok, txhash_param}} <- fetch_txhash(params),
          {:format, {:ok, transaction_hash}} <- to_transaction_hash(txhash_param),
          {:transaction, {:ok, transaction}} <- transaction_from_hash(transaction_hash) do
-      case transaction.to_address.smart_contract do
-        nil ->
-          case Chain.get_contract_method_by_input_data(transaction.input) do
-            nil ->
-              render(conn, :getabibytxhash, %{
-                abi: "", verified: false}
-              )
-            contract_method ->
-              render(conn, :getabibytxhash, %{
-                abi: contract_method.abi, verified: false}
-              )
-          end
-        smart_contract ->
-          full_abi = Chain.combine_proxy_implementation_abi(
-            smart_contract.address_hash,
-            smart_contract.abi
-          )
+      case transaction.input do
+        %{bytes: ""} ->
           render(conn, :getabibytxhash, %{
-            abi: full_abi, verified: true}
+            abi: "", verified: false}
           )
+        _ ->
+          contract_method = Chain.get_contract_method_by_input_data(transaction.input)
+          case transaction.to_address.smart_contract do
+            nil ->
+              case contract_method do
+                nil ->
+                  render(conn, :getabibytxhash, %{
+                    abi: "", verified: false}
+                  )
+                contract_method ->
+                  render(conn, :getabibytxhash, %{
+                    abi: contract_method.abi, verified: false}
+                  )
+              end
+            smart_contract ->
+              case contract_method do
+                nil ->
+                  full_abi = Chain.combine_proxy_implementation_abi(
+                    smart_contract.address_hash,
+                    smart_contract.abi
+                  )
+                  render(conn, :getabibytxhash, %{
+                    abi: full_abi, verified: true}
+                  )
+                contract_method ->
+                  render(conn, :getabibytxhash, %{
+                    abi: contract_method.abi, verified: true}
+                  )
+              end
+          end
       end
     else
       {:txhash_param, :error} ->
