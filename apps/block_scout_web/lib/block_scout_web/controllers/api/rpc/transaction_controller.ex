@@ -253,7 +253,10 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
              [token_transfers: :from_address] => :optional,
              [token_transfers: :token_contract_address] => :optional,
              [to_address: :smart_contract] => :optional,
+             [to_address: :names] => :optional,
+             [from_address: :names] => :optional,
              to_address: :required,
+             from_address: :required,
              block: :required
            }
          ) do
@@ -271,7 +274,12 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
              [token_transfers: :to_address] => :optional,
              [token_transfers: :from_address] => :optional,
              [token_transfers: :token_contract_address] => :optional,
-             :block => :required
+             [to_address: :smart_contract] => :optional,
+             [to_address: :names] => :optional,
+             [from_address: :names] => :optional,
+             to_address: :required,
+             from_address: :required,
+             block: :required
            }
          ) do
       {:error, :not_found} ->
