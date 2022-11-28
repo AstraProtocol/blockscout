@@ -18,8 +18,11 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     RPCView.render("show.json", data: Jason.encode!(abi))
   end
 
-  def render("getsourcecode.json", %{contract: contract}) do
-    RPCView.render("show.json", data: [prepare_source_code_contract(contract)])
+  def render("getsourcecode.json", %{contract: contract, same_bytecode_address: same_bytecode_address}) do
+    RPCView.render(
+      "show.json",
+      data: [Map.put(prepare_source_code_contract(contract), "SameBytecodeAddress", same_bytecode_address)]
+    )
   end
 
   def render("error.json", assigns) do

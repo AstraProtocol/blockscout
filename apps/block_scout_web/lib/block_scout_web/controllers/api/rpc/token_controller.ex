@@ -177,7 +177,7 @@ defmodule BlockScoutWeb.API.RPC.TokenController do
         render(conn, :error, error: "Invalid contract address hash")
 
       {:error, :not_found}  ->
-        render(conn, :error, error: "Token not found in address")
+        render(conn, :error, error: "Token not found in contract address")
     end
   end
 
