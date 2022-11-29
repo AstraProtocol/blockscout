@@ -420,7 +420,10 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
                 Chain.get_address_verified_twin_contract(address_hash).verified_contract
             render(conn, :getsourcecode, %{
               contract: address,
-              same_bytecode_address: to_string(address_verified_twin_contract.address_hash)
+              same_bytecode_address: to_string(
+                address_verified_twin_contract
+                && address_verified_twin_contract.address_hash
+              )
             })
           end
       end
