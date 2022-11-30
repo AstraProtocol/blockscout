@@ -85,7 +85,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       "index" => transaction.index,
       "createdContractAddressHash" => to_string(transaction.created_contract_address_hash),
       "createdContractAddressName" => prepare_address_name(transaction.created_contract_address),
-      "createdContractCodeIndexedAt" => to_string(transaction.created_contract_code_indexed_at),
+      "createdContractCodeIndexedAt" => transaction.created_contract_code_indexed_at,
       "nonce" => transaction.nonce,
       "r" => transaction.r,
       "s" => transaction.s,
