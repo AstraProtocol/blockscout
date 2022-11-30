@@ -89,7 +89,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
           )
         _ ->
           contract_method = Chain.get_contract_method_by_input_data(transaction.input)
-          case transaction.to_address.smart_contract do
+          case transaction.to_address && transaction.to_address.smart_contract do
             nil ->
               case contract_method do
                 nil ->
