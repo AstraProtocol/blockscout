@@ -4069,6 +4069,19 @@ defmodule Explorer.Chain do
     contract_method_query |> Repo.one()
   end
 
+  def get_contract_method_name_by_input_data(%{bytes: <<_::binary-size(4), _::binary>>} = input) do
+    case get_contract_method_by_input_data(input) do
+      nil ->
+        nil
+      contract_method ->
+        contract_method.abi["name"]
+    end
+  end
+
+  def get_contract_method_name_by_input_data(_) do
+    "transfer"
+  end
+
   def smart_contract_bytecode(address_hash) do
     query =
       from(
