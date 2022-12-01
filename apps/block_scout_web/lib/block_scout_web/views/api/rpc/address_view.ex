@@ -244,7 +244,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "success" => if(transaction.status == :ok, do: true, else: false),
       "error" => "#{transaction.error}",
       "createdContractAddressHash" => "#{transaction.created_contract_address_hash}",
-      "contractMethodName" => get_contract_method_name(transaction.input)
+      "contractMethodName" => Chain.get_contract_method_name_by_input_data(transaction.input)
     }
   end
 
@@ -287,7 +287,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "gasUsed" => tx.gas_used,
       "cumulativeGasUsed" => tx.cumulative_gas_used,
       "input" => tx.input,
-      "contractMethodName" => get_contract_method_name(tx.input)
+      "contractMethodName" => Chain.get_contract_method_name_by_input_data(tx.input)
     }
   end
 
@@ -403,15 +403,6 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
           _ ->
             ""
         end
-    end
-  end
-
-  defp get_contract_method_name(input) do
-    case Chain.get_contract_method_by_input_data(input) do
-      nil ->
-        nil
-      contract_method ->
-        contract_method.abi["name"]
     end
   end
 
