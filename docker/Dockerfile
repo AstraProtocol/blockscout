@@ -44,34 +44,28 @@ ADD apps/indexer/mix.exs ./apps/indexer/
 
 RUN mix do deps.get, local.rebar --force, deps.compile
 
-ADD . .
+# Update base image npm
+RUN npm install npm@latest
 
-COPY . .
-
-# Run forderground build and phoenix digest
-RUN mix compile && npm install npm@latest
+# Cache npm deps before application code
+ADD apps/block_scout_web/assets/ ./apps/block_scout_web/assets/
+ADD apps/explorer/package*.json ./apps/explorer/
 
 # Add blockscout npm deps
 RUN cd apps/block_scout_web/assets/ && \
     npm install && \
-    npm run deploy
+    npm run deploy \
+
 RUN cd /app/apps/explorer/ && \
     npm install && \
     apk update && \
-    apk del --force-broken-world alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3
+    apk del --force-broken-world alpine-sdk gmp-dev automake libtool inotify-tools autoconf python3 \
 
-RUN mix phx.digest
+# Add app code
+ADD . .
 
-RUN mkdir -p /opt/release \
-  && mix release blockscout \
-  && mv _build/${MIX_ENV}/rel/blockscout /opt/release
-
-##############################################################
-#FROM bitwalker/alpine-elixir-phoenix:1.13
-
-#WORKDIR /app
-
-#COPY --from=builder /opt/release/blockscout .
-#COPY --from=builder /app/apps/explorer/node_modules ./node_modules
+# Invalidate cache via modifying build args on compilation
+ARG FORCE_MIX_COMPILE_CACHE_MISS
+RUN mix compile && mix phx.digest
 
 CMD ["mix", "phx.server"]
