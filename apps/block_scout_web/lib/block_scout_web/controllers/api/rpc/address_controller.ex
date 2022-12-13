@@ -634,7 +634,8 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         transaction_count: transactions_from_db,
         token_transfer_count: token_transfers_from_db,
         gas_usage_count: address_gas_usage_from_db,
-        validation_count: validation_count
+        validation_count: validation_count,
+        address: address
       })
     else
       {:address_param, :error} ->
