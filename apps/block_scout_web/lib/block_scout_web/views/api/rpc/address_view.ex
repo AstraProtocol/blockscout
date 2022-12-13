@@ -145,13 +145,16 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       transaction_count: transactions_from_db,
       token_transfer_count: token_transfers_from_db,
       gas_usage_count: address_gas_usage_from_db,
-      validation_count: validation_count})
+      validation_count: validation_count,
+      address: address})
     do
+    creator = prepare_creator(address)
     data = %{
       "transactionCount" => transactions_from_db,
       "tokenTransferCount" => token_transfers_from_db,
       "gasUsageCount" => address_gas_usage_from_db,
-      "validationCount" => validation_count
+      "validationCount" => validation_count,
+      "type" => get_address_type(creator),
     }
     RPCView.render("show.json", data: data)
   end
