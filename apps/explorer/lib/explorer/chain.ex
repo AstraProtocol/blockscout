@@ -3153,7 +3153,7 @@ defmodule Explorer.Chain do
         select: last_fetched_counter.value
       )
 
-    Repo.one!(query) || Decimal.new(0)
+    Repo.one(query) || Decimal.new(0)
   end
 
   defp block_status({number, timestamp}) do
