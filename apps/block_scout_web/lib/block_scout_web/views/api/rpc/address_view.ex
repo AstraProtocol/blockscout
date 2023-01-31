@@ -402,7 +402,13 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       _ ->
         case address.names do
           [_|_] ->
-            Enum.at(address.names, 0).name
+            primary_address_name = Enum.filter(address.names, fn address_name -> address_name.primary == true end)
+            case address.names do
+              [_|_] ->
+                Enum.at(primary_address_name, 0).name
+              _ ->
+                ""
+            end
           _ ->
             ""
         end
