@@ -1467,7 +1467,7 @@ defmodule Explorer.Chain do
         from(address in Address,
           left_join: address_name in Address.Name,
           on: address.hash == address_name.address_hash,
-          where: address.hash == ^address_hash,
+          where: address.hash == ^address_hash and address_name.primary == ^true,
           select: %{
             address_hash: address.hash,
             tx_hash: fragment("CAST(NULL AS bytea)"),
