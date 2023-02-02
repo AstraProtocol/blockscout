@@ -69,9 +69,16 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
   end
 
   defp prepare_list_tokens(token) do
+    address_name = prepare_address_name(token.contract_address)
     %{
       "cataloged" => token.cataloged,
       "contractAddressHash" => to_string(token.contract_address_hash),
+      "contractAddressName" => case address_name do
+        "" ->
+          token.name
+        _ ->
+          address_name
+      end,
       "decimals" => to_string(token.decimals),
       "holderCount" => token.holder_count,
       "name" => token.name,
