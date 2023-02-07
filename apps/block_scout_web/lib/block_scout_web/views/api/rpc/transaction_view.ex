@@ -2,6 +2,9 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   use BlockScoutWeb, :view
 
   alias BlockScoutWeb.API.RPC.RPCView
+  alias Explorer.Chain
+
+  require Logger
 
   def render("gettxinfo.json", %{
         transaction: transaction,
@@ -63,6 +66,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   end
 
   defp prepare_transaction(transaction, block_height, logs) do
+    {_, fee_value} = Chain.fee(transaction, :ether)
     %{
       "blockHeight" => transaction.block_number,
       "blockHash" => "#{transaction.block.hash}",
@@ -81,6 +85,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       "gasLimit" => transaction.gas,
       "gasUsed" => transaction.gas_used,
       "gasPrice" => transaction.gas_price.value,
+      "feeValue" => fee_value,
       "cumulativeGasUsed" => transaction.cumulative_gas_used,
       "index" => transaction.index,
       "createdContractAddressHash" => to_string(transaction.created_contract_address_hash),
