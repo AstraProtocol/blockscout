@@ -4,8 +4,6 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   alias BlockScoutWeb.API.RPC.RPCView
   alias Explorer.Chain
 
-  require Logger
-
   def render("gettxinfo.json", %{
         transaction: transaction,
         block_height: block_height,
