@@ -1,7 +1,6 @@
 defmodule BlockScoutWeb.API.RPC.ContractView do
   use BlockScoutWeb, :view
 
-  alias BlockScoutWeb.AddressView
   alias BlockScoutWeb.API.RPC.RPCView
   alias Explorer.Chain
   alias Explorer.Chain.{Address, DecompiledSmartContract, SmartContract}
@@ -18,8 +17,11 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     RPCView.render("show.json", data: Jason.encode!(abi))
   end
 
-  def render("getsourcecode.json", %{contract: contract}) do
-    RPCView.render("show.json", data: [prepare_source_code_contract(contract)])
+  def render("getsourcecode.json", %{contract: contract, same_bytecode_address: same_bytecode_address}) do
+    RPCView.render(
+      "show.json",
+      data: [Map.put(prepare_source_code_contract(contract), "SameBytecodeAddress", same_bytecode_address)]
+    )
   end
 
   def render("error.json", assigns) do
@@ -181,7 +183,7 @@ defmodule BlockScoutWeb.API.RPC.ContractView do
     additional_sources_from_twin = Chain.get_address_verified_twin_contract(address.hash).additional_sources
 
     additional_sources =
-      if AddressView.smart_contract_verified?(address),
+      if address.verified,
         do: address.smart_contract_additional_sources,
         else: additional_sources_from_twin
 

@@ -69,9 +69,16 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
   end
 
   defp prepare_list_tokens(token) do
+    address_name = prepare_address_name(token.contract_address)
     %{
       "cataloged" => token.cataloged,
       "contractAddressHash" => to_string(token.contract_address_hash),
+      "contractAddressName" => case address_name do
+        "" ->
+          token.name
+        _ ->
+          address_name
+      end,
       "decimals" => to_string(token.decimals),
       "holderCount" => token.holder_count,
       "name" => token.name,
@@ -90,10 +97,19 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
 
   defp prepare_unique_tokens(unique_token) do
     %{
-      "tokenId" => "#{unique_token.instance.token_id}",
+      "tokenId" => "#{unique_token.token_id}",
       "ownerAddress" => to_string(unique_token.to_address_hash),
-      "metadata" => unique_token.instance.metadata
+      "metadata" => prepare_metadata(unique_token)
     }
+  end
+
+  defp prepare_metadata(unique_token) do
+    case unique_token.instance do
+      nil ->
+        nil
+      _ ->
+        unique_token.instance.metadata
+    end
   end
 
   defp prepare_token_transfer(token_transfer) do
@@ -122,7 +138,13 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
       _ ->
         case address.names do
           [_|_] ->
-            Enum.at(address.names, 0).name
+            primary_address_name = Enum.filter(address.names, fn address_name -> address_name.primary == true end)
+            case primary_address_name do
+              [_|_] ->
+                Enum.at(primary_address_name, 0).name
+              _ ->
+                ""
+            end
           _ ->
             ""
         end

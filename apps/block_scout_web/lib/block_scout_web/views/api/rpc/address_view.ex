@@ -11,7 +11,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     RPCView.render("show.json", data: accounts)
   end
 
-  def render("getaddress.json", %{address_detail: address_detail}) do
+  def render("getaddress.json", %{address_detail: address_detail, verified: verified}) do
     contractName = prepare_address_name(address_detail)
     creationTransaction = prepare_creation_transaction(address_detail)
     creator = prepare_creator(address_detail)
@@ -23,7 +23,8 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "creationTransaction" => creationTransaction,
       "creator" => creator,
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
-      "type" => get_address_type(creator)
+      "type" => get_address_type(creator),
+      "verified" => verified
     }
     RPCView.render("show.json", data: data)
   end
@@ -144,13 +145,16 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       transaction_count: transactions_from_db,
       token_transfer_count: token_transfers_from_db,
       gas_usage_count: address_gas_usage_from_db,
-      validation_count: validation_count})
+      validation_count: validation_count,
+      address: address})
     do
+    creator = prepare_creator(address)
     data = %{
       "transactionCount" => transactions_from_db,
       "tokenTransferCount" => token_transfers_from_db,
       "gasUsageCount" => address_gas_usage_from_db,
-      "validationCount" => validation_count
+      "validationCount" => validation_count,
+      "type" => get_address_type(creator),
     }
     RPCView.render("show.json", data: data)
   end
@@ -243,7 +247,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "success" => if(transaction.status == :ok, do: true, else: false),
       "error" => "#{transaction.error}",
       "createdContractAddressHash" => "#{transaction.created_contract_address_hash}",
-      "contractMethodName" => get_contract_method_name(transaction.input)
+      "contractMethodName" => Chain.get_contract_method_name_by_input_data(transaction.input)
     }
   end
 
@@ -286,7 +290,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "gasUsed" => tx.gas_used,
       "cumulativeGasUsed" => tx.cumulative_gas_used,
       "input" => tx.input,
-      "contractMethodName" => get_contract_method_name(tx.input)
+      "contractMethodName" => Chain.get_contract_method_name_by_input_data(tx.input)
     }
   end
 
@@ -398,19 +402,16 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       _ ->
         case address.names do
           [_|_] ->
-            Enum.at(address.names, 0).name
+            primary_address_name = Enum.filter(address.names, fn address_name -> address_name.primary == true end)
+            case primary_address_name do
+              [_|_] ->
+                Enum.at(primary_address_name, 0).name
+              _ ->
+                ""
+            end
           _ ->
             ""
         end
-    end
-  end
-
-  defp get_contract_method_name(input) do
-    case Chain.get_contract_method_by_input_data(input) do
-      nil ->
-        nil
-      contract_method ->
-        contract_method.abi["name"]
     end
   end
 

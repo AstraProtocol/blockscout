@@ -2532,7 +2532,8 @@ defmodule Explorer.Chain do
       from(t in Token,
         where: t.total_supply > ^0,
         order_by: [desc_nulls_last: t.holder_count, asc: t.name],
-        preload: [:contract_address]
+        preload: [:contract_address],
+        preload: [contract_address: :names]
       )
 
     base_query_with_paging =
@@ -3153,7 +3154,7 @@ defmodule Explorer.Chain do
         select: last_fetched_counter.value
       )
 
-    Repo.one!(query) || Decimal.new(0)
+    Repo.one(query) || Decimal.new(0)
   end
 
   defp block_status({number, timestamp}) do
@@ -4067,6 +4068,19 @@ defmodule Explorer.Chain do
         limit: 1
       )
     contract_method_query |> Repo.one()
+  end
+
+  def get_contract_method_name_by_input_data(%{bytes: <<_::binary-size(4), _::binary>>} = input) do
+    case get_contract_method_by_input_data(input) do
+      nil ->
+        nil
+      contract_method ->
+        contract_method.abi["name"]
+    end
+  end
+
+  def get_contract_method_name_by_input_data(_) do
+    "transfer"
   end
 
   def smart_contract_bytecode(address_hash) do

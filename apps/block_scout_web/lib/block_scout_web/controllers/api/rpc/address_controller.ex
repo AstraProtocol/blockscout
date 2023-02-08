@@ -27,8 +27,14 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
   def getaddress(conn, params) do
     with {:address_param, {:ok, address_param}} <- fetch_address(params),
          {:format, {:ok, address_hash}} <- to_address_hash(address_param) do
-      {:ok, address} = Chain.hash_to_address(address_hash)
-      render(conn, "getaddress.json", %{address_detail: address})
+      case Chain.hash_to_address(address_hash) do
+        {:ok, address} ->
+          render(conn, "getaddress.json",
+            %{address_detail: address, verified: Chain.smart_contract_fully_verified?(address_param)}
+          )
+        _ ->
+          render(conn, :error, error: "Address not found")
+      end
     else
       {:address_param, :error} ->
         render(conn, :error, error: "Query parameter 'address' is required")
@@ -628,7 +634,8 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         transaction_count: transactions_from_db,
         token_transfer_count: token_transfers_from_db,
         gas_usage_count: address_gas_usage_from_db,
-        validation_count: validation_count
+        validation_count: validation_count,
+        address: address
       })
     else
       {:address_param, :error} ->

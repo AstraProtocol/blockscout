@@ -400,12 +400,33 @@ defmodule BlockScoutWeb.API.RPC.ContractController do
   def getsourcecode(conn, params) do
     with {:address_param, {:ok, address_param}} <- fetch_address(params),
          {:format, {:ok, address_hash}} <- to_address_hash(address_param) do
-      _ = VerificationController.check_and_verify(address_param)
       address = Contracts.address_hash_to_address_with_source_code(address_hash)
 
-      render(conn, :getsourcecode, %{
-        contract: address || %Address{hash: address_hash, smart_contract: nil}
-      })
+      case address do
+        nil ->
+          render(conn, :getsourcecode, %{
+            contract: %Address{hash: address_hash, smart_contract: nil},
+            same_bytecode_address: ""
+          })
+        address ->
+          if address.verified do
+            render(conn, :getsourcecode, %{
+              contract: address,
+              same_bytecode_address: ""
+            })
+          else
+            address_verified_twin_contract =
+              Chain.get_minimal_proxy_template(address_hash) ||
+                Chain.get_address_verified_twin_contract(address_hash).verified_contract
+            render(conn, :getsourcecode, %{
+              contract: address,
+              same_bytecode_address: to_string(
+                address_verified_twin_contract
+                && address_verified_twin_contract.address_hash
+              )
+            })
+          end
+      end
     else
       {:address_param, :error} ->
         render(conn, :error, error: @address_required)

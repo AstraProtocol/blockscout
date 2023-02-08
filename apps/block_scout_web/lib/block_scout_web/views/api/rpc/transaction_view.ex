@@ -2,6 +2,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   use BlockScoutWeb, :view
 
   alias BlockScoutWeb.API.RPC.RPCView
+  alias Explorer.Chain
 
   def render("gettxinfo.json", %{
         transaction: transaction,
@@ -12,8 +13,8 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
     RPCView.render("show.json", data: data)
   end
 
-  def render("getabibytxhash.json", %{abi: abi}) do
-    RPCView.render("show.json", data: %{"abi" => abi})
+  def render("getabibytxhash.json", %{abi: abi, verified: verified}) do
+    RPCView.render("show.json", data: %{"abi" => abi, "verified" => verified})
   end
 
   def render("getrawtracebytxhash.json", %{raw_trace: raw_trace}) do
@@ -63,6 +64,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   end
 
   defp prepare_transaction(transaction, block_height, logs) do
+    {_, fee_value} = Chain.fee(transaction, :wei)
     %{
       "blockHeight" => transaction.block_number,
       "blockHash" => "#{transaction.block.hash}",
@@ -73,15 +75,19 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       "success" => if(transaction.status == :ok, do: true, else: false),
       "error" => "#{transaction.error}",
       "from" => "#{transaction.from_address_hash}",
+      "fromAddressName" => prepare_address_name(transaction.from_address),
       "to" => "#{transaction.to_address_hash}",
+      "toAddressName" => prepare_address_name(transaction.to_address),
       "value" => transaction.value.value,
       "input" => "#{transaction.input}",
       "gasLimit" => transaction.gas,
       "gasUsed" => transaction.gas_used,
       "gasPrice" => transaction.gas_price.value,
+      "transactionFee" => fee_value,
       "cumulativeGasUsed" => transaction.cumulative_gas_used,
       "index" => transaction.index,
-      "createdContractAddressHash" => transaction.created_contract_address_hash,
+      "createdContractAddressHash" => to_string(transaction.created_contract_address_hash),
+      "createdContractAddressName" => prepare_address_name(transaction.created_contract_address),
       "createdContractCodeIndexedAt" => transaction.created_contract_code_indexed_at,
       "nonce" => transaction.nonce,
       "r" => transaction.r,
@@ -129,7 +135,13 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       _ ->
         case address.names do
           [_|_] ->
-            Enum.at(address.names, 0).name
+            primary_address_name = Enum.filter(address.names, fn address_name -> address_name.primary == true end)
+            case primary_address_name do
+              [_|_] ->
+                Enum.at(primary_address_name, 0).name
+              _ ->
+                ""
+            end
           _ ->
             ""
         end
