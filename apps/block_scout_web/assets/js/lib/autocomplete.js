@@ -49,15 +49,20 @@ const resultsListElement = (list, data) => {
 export const searchEngine = (query, record) => {
   const queryLowerCase = query.toLowerCase()
   if (record && (
-    (record.name && record.name.toLowerCase().includes(queryLowerCase)) ||
-      (record.symbol && record.symbol.toLowerCase().includes(queryLowerCase)) ||
-      (record.address_hash && record.address_hash.toLowerCase().includes(queryLowerCase)) ||
-      (record.tx_hash && record.tx_hash.toLowerCase().includes(queryLowerCase)) ||
-      (record.block_hash && record.block_hash.toLowerCase().includes(queryLowerCase))
+    (record.name && record.name.toLowerCase().includes(query.toLowerCase())) ||
+      (record.symbol && record.symbol.toLowerCase().includes(query.toLowerCase())) ||
+      (record.address_hash && record.address_hash.toLowerCase().includes(query.toLowerCase())) ||
+      (record.cosmos_hash && record.cosmos_hash.toLowerCase().includes(query.toLowerCase())) ||
+      (record.tx_hash && record.tx_hash.toLowerCase().includes(query.toLowerCase())) ||
+      (record.block_hash && record.block_hash.toLowerCase().includes(query.toLowerCase()))
   )
   ) {
     let searchResult = '<div>'
     searchResult += `<div>${record.address_hash || record.tx_hash || record.block_hash}</div>`
+
+    if (record.type === 'transaction_cosmos') {
+      searchResult = `<div>${record.cosmos_hash}</div>`
+    }
 
     if (record.type === 'label') {
       searchResult += `<div class="fontawesome-icon tag"></div><span> <b>${record.name}</b></span>`
@@ -148,6 +153,8 @@ const selection = (event) => {
     window.location = `/tokens/${selectionValue.address_hash}`
   } else if (selectionValue.type === 'transaction') {
     window.location = `/tx/${selectionValue.tx_hash}`
+  } else if (selectionValue.type === 'transaction_cosmos') {
+    window.location = `/tx/${selectionValue.cosmos_hash}`
   } else if (selectionValue.type === 'block') {
     window.location = `/blocks/${selectionValue.block_hash}`
   }
