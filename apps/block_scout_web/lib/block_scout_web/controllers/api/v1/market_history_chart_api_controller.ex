@@ -12,14 +12,7 @@ defmodule BlockScoutWeb.API.V1.MarketHistoryChartApiController do
 
       recent_market_history = Market.fetch_recent_history()
 
-      market_history_data =
-        case recent_market_history do
-          [today | the_rest] ->
-            encode_market_history_data([%{today | closing_price: exchange_rate.usd_value} | the_rest])
-
-          data ->
-            encode_market_history_data(data)
-        end
+      market_history_data = encode_market_history_data(recent_market_history)
 
       send_resp(conn, :ok, result(market_history_data,
                                   available_supply(Chain.supply_for_days(), exchange_rate)
