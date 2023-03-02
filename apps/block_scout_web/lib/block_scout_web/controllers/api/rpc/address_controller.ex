@@ -644,6 +644,9 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
       {:format, :error} ->
         render(conn, :error, error: "Invalid address format")
 
+      {:address, :not_found} ->
+        render(conn, :error, error: "Address not found")
+
       _ ->
         render(conn, "getaddresscounters.json", %{
           transaction_count: 0,
