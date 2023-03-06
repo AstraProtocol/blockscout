@@ -33,7 +33,16 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
             %{address_detail: address, verified: Chain.smart_contract_fully_verified?(address_param)}
           )
         _ ->
-          render(conn, :error, error: "Address not found")
+          address = %Chain.Address{
+            hash: address_hash,
+            smart_contract: nil,
+            token: nil,
+            fetched_coin_balance: %Wei{value: Decimal.new(0)}
+          }
+          CoinBalanceOnDemand.trigger_fetch(address)
+          render(conn, "getaddress.json",
+            %{address_detail: address, verified: false}
+          )
       end
     else
       {:address_param, :error} ->

@@ -419,10 +419,14 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     if is_nil(address_detail.contracts_creation_internal_transaction) do
       to_string(address_detail.contracts_creation_transaction && address_detail.contracts_creation_transaction.hash)
     else
-      to_string(
-        address_detail.contracts_creation_internal_transaction &&
-          address_detail.contracts_creation_internal_transaction.transaction_hash
-      )
+      try do
+        to_string(
+          address_detail.contracts_creation_internal_transaction &&
+            address_detail.contracts_creation_internal_transaction.transaction_hash
+        )
+      rescue
+        KeyError -> ""
+      end
     end
   end
 
@@ -432,10 +436,14 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
         address_detail.contracts_creation_transaction.from_address_hash
       )
     else
-      to_string(
-        address_detail.contracts_creation_internal_transaction &&
-          address_detail.contracts_creation_internal_transaction.from_address_hash
-      )
+      try do
+        to_string(
+          address_detail.contracts_creation_internal_transaction &&
+            address_detail.contracts_creation_internal_transaction.from_address_hash
+        )
+      rescue
+        KeyError -> ""
+      end
     end
   end
 
