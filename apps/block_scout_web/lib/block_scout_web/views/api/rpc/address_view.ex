@@ -17,7 +17,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     creator = prepare_creator(address_detail)
     data = %{
       "contractName" => contractName,
-      "balance" => address_detail.fetched_coin_balance.value,
+      "balance" => (address_detail.fetched_coin_balance && address_detail.fetched_coin_balance.value) || "0",
       "tokenName" => to_string(address_detail.token && address_detail.token.name),
       "tokenSymbol" => to_string(address_detail.token && address_detail.token.symbol),
       "creationTransaction" => creationTransaction,
