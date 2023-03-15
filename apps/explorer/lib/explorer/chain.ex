@@ -4060,6 +4060,35 @@ defmodule Explorer.Chain do
     Wei.to(value, unit)
   end
 
+  @spec get_address_name(Address.t()) :: String.t()
+  def get_address_name(address) do
+    case address do
+      nil ->
+        ""
+      _ ->
+        case address.names do
+          [_|_] ->
+            primary_address_name = Enum.filter(address.names, fn address_name -> address_name.primary == true end)
+            case primary_address_name do
+              [_|_] ->
+                Enum.at(primary_address_name, 0).name
+              _ ->
+                non_primary_address_name = Enum.filter(
+                  address.names, fn address_name -> address_name.primary != true end
+                )
+                case non_primary_address_name do
+                  [_|_] ->
+                    Enum.at(non_primary_address_name, 0).name
+                  _ ->
+                    ""
+                end
+            end
+          _ ->
+            ""
+        end
+    end
+  end
+
   def get_contract_method_by_input_data(%{bytes: <<method_id::binary-size(4), _::binary>>}) do
     contract_method_query =
       from(
@@ -4073,7 +4102,7 @@ defmodule Explorer.Chain do
   def get_contract_method_name_by_input_data(%{bytes: <<_::binary-size(4), _::binary>>} = input) do
     case get_contract_method_by_input_data(input) do
       nil ->
-        ""
+        nil
       contract_method ->
         contract_method.abi["name"]
     end

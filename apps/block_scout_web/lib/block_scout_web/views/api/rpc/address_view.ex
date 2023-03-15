@@ -12,7 +12,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
   end
 
   def render("getaddress.json", %{address_detail: address_detail, verified: verified}) do
-    contractName = prepare_address_name(address_detail)
+    contractName = Chain.get_address_name(address_detail)
     creationTransaction = prepare_creation_transaction(address_detail)
     creator = prepare_creator(address_detail)
     data = %{
@@ -236,9 +236,9 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "cosmosHash" => "#{transaction.cosmos_hash}",
       "blockHash" => "#{transaction.block_hash}",
       "from" => "#{transaction.from_address_hash}",
-      "fromAddressName" => prepare_address_name(transaction.from_address),
+      "fromAddressName" => Chain.get_address_name(transaction.from_address),
       "to" => "#{transaction.to_address_hash}",
-      "toAddressName" => prepare_address_name(transaction.to_address),
+      "toAddressName" => Chain.get_address_name(transaction.to_address),
       "value" => "#{transaction.value.value}",
       "gas" => "#{transaction.gas}",
       "gasPrice" => "#{transaction.gas_price.value}",
@@ -247,7 +247,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "success" => if(transaction.status == :ok, do: true, else: false),
       "error" => "#{transaction.error}",
       "createdContractAddressHash" => "#{transaction.created_contract_address_hash}",
-      "contractMethodName" => Chain.get_contract_method_name_by_input_data(transaction.input)
+      "contractMethodName" => Chain.get_contract_method_name_by_input_data(transaction.input) || ""
     }
   end
 
@@ -256,9 +256,9 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "blockNumber" => "#{internal_transaction.block_number}",
       "timeStamp" => "#{DateTime.to_unix(internal_transaction.transaction.block.timestamp)}",
       "from" => "#{internal_transaction.from_address_hash}",
-      "fromAddressName" => prepare_address_name(internal_transaction.from_address),
+      "fromAddressName" => Chain.get_address_name(internal_transaction.from_address),
       "to" => "#{internal_transaction.to_address_hash}",
-      "toAddressName" => prepare_address_name(internal_transaction.to_address),
+      "toAddressName" => Chain.get_address_name(internal_transaction.to_address),
       "value" => "#{internal_transaction.value.value}",
       "contractAddress" => "#{internal_transaction.created_contract_address_hash}",
       "transactionHash" => to_string(internal_transaction.transaction_hash),
@@ -281,9 +281,9 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "nonce" => tx.nonce,
       "blockHash" => to_string(tx.block.hash),
       "from" => to_string(tx.from_address_hash),
-      "fromAddressName" => prepare_address_name(tx.from_address),
+      "fromAddressName" => Chain.get_address_name(tx.from_address),
       "to" => to_string(tx.to_address_hash),
-      "toAddressName" => prepare_address_name(tx.to_address),
+      "toAddressName" => Chain.get_address_name(tx.to_address),
       "tokenTransfers" => Enum.map(tx.token_transfers,
         fn token_transfer -> prepare_token_transfer_for_api(token_transfer) end),
       "transactionIndex" => tx.index,
@@ -292,7 +292,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "gasUsed" => tx.gas_used,
       "cumulativeGasUsed" => tx.cumulative_gas_used,
       "input" => tx.input,
-      "contractMethodName" => Chain.get_contract_method_name_by_input_data(tx.input)
+      "contractMethodName" => Chain.get_contract_method_name_by_input_data(tx.input) || ""
     }
   end
 
@@ -347,9 +347,9 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "amount" => "#{token_transfer.amount}",
       "logIndex" => "#{token_transfer.log_index}",
       "fromAddress" => "#{token_transfer.from_address}",
-      "fromAddressName" => prepare_address_name(token_transfer.from_address),
+      "fromAddressName" => Chain.get_address_name(token_transfer.from_address),
       "toAddress" => "#{token_transfer.to_address}",
-      "toAddressName" => prepare_address_name(token_transfer.to_address),
+      "toAddressName" => Chain.get_address_name(token_transfer.to_address),
       "tokenContractAddress" => "#{token_transfer.token_contract_address}",
       "tokenName" => "#{token_transfer.token.name}",
       "tokenSymbol" => "#{token_transfer.token.symbol}",
@@ -395,34 +395,6 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
 
   defp get_topics(log) do
     [log.first_topic, log.second_topic, log.third_topic, log.fourth_topic]
-  end
-
-  defp prepare_address_name(address) do
-    case address do
-      nil ->
-        ""
-      _ ->
-        case address.names do
-          [_|_] ->
-            primary_address_name = Enum.filter(address.names, fn address_name -> address_name.primary == true end)
-            case primary_address_name do
-              [_|_] ->
-                Enum.at(primary_address_name, 0).name
-              _ ->
-                non_primary_address_name = Enum.filter(
-                  address.names, fn address_name -> address_name.primary != true end
-                )
-                case non_primary_address_name do
-                  [_|_] ->
-                    Enum.at(non_primary_address_name, 0).name
-                  _ ->
-                    ""
-                end
-            end
-          _ ->
-            ""
-        end
-    end
   end
 
   defp prepare_creation_transaction(address_detail) do

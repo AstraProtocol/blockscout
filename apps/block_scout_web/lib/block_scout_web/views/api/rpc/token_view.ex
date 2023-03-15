@@ -1,6 +1,7 @@
 defmodule BlockScoutWeb.API.RPC.TokenView do
   use BlockScoutWeb, :view
 
+  alias Explorer.Chain
   alias BlockScoutWeb.API.RPC.RPCView
 
   def render("gettoken.json", %{token_detail: token_detail}) do
@@ -69,7 +70,7 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
   end
 
   defp prepare_list_tokens(token) do
-    address_name = prepare_address_name(token.contract_address)
+    address_name = Chain.get_address_name(token.contract_address)
     %{
       "cataloged" => token.cataloged,
       "contractAddressHash" => to_string(token.contract_address_hash),
@@ -120,34 +121,14 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
       "timestamp" => to_string(DateTime.to_unix(token_transfer.transaction.block.timestamp)),
       "amount" => "#{token_transfer.amount}",
       "fromAddress" => "#{token_transfer.from_address}",
-      "fromAddressName" => prepare_address_name(token_transfer.from_address),
+      "fromAddressName" => Chain.get_address_name(token_transfer.from_address),
       "toAddress" => "#{token_transfer.to_address}",
-      "toAddressName" => prepare_address_name(token_transfer.to_address),
+      "toAddressName" => Chain.get_address_name(token_transfer.to_address),
       "tokenContractAddress" => "#{token_transfer.token_contract_address}",
       "tokenName" => "#{token_transfer.token.name}",
       "tokenSymbol" => "#{token_transfer.token.symbol}",
       "tokenId" => "#{token_transfer.token_id}",
       "decimals" => "#{token_transfer.token.decimals}"
     }
-  end
-
-  defp prepare_address_name(address) do
-    case address do
-      nil ->
-        ""
-      _ ->
-        case address.names do
-          [_|_] ->
-            primary_address_name = Enum.filter(address.names, fn address_name -> address_name.primary == true end)
-            case primary_address_name do
-              [_|_] ->
-                Enum.at(primary_address_name, 0).name
-              _ ->
-                ""
-            end
-          _ ->
-            ""
-        end
-    end
   end
 end
