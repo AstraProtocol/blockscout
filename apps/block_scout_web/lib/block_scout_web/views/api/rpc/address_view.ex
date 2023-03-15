@@ -281,7 +281,9 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "nonce" => tx.nonce,
       "blockHash" => to_string(tx.block.hash),
       "from" => to_string(tx.from_address_hash),
+      "fromAddressName" => prepare_address_name(tx.from_address),
       "to" => to_string(tx.to_address_hash),
+      "toAddressName" => prepare_address_name(tx.to_address),
       "tokenTransfers" => Enum.map(tx.token_transfers,
         fn token_transfer -> prepare_token_transfer_for_api(token_transfer) end),
       "transactionIndex" => tx.index,
@@ -407,7 +409,15 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
               [_|_] ->
                 Enum.at(primary_address_name, 0).name
               _ ->
-                ""
+                non_primary_address_name = Enum.filter(
+                  address.names, fn address_name -> address_name.primary != true end
+                )
+                case non_primary_address_name do
+                  [_|_] ->
+                    Enum.at(non_primary_address_name, 0).name
+                  _ ->
+                    ""
+                end
             end
           _ ->
             ""
