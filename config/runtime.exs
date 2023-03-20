@@ -264,7 +264,7 @@ config :explorer, Explorer.ExchangeRates.Source, source: exchange_rates_source
 
 config :explorer, Explorer.KnownTokens, enabled: System.get_env("DISABLE_KNOWN_TOKENS") != "true", store: :ets
 
-config :explorer, Explorer.Market.History.Cataloger, enabled: true
+config :explorer, Explorer.Market.History.Cataloger, enabled: disable_indexer != "true"
 
 txs_stats_init_lag =
   System.get_env("TXS_HISTORIAN_INIT_LAG", "0")
