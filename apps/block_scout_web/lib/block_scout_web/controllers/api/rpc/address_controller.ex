@@ -105,6 +105,41 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     end
   end
 
+  def update_balance(conn, params) do
+    with {:address_param, {:ok, address_param}} <- fetch_address(params),
+         {:block_param, {:ok, block_param}} <- fetch_block(params),
+         {:balance_param, {:ok, balance_param}} <- fetch_balance(params) do
+      change_param = %{
+        fetched_coin_balance: String.to_integer(balance_param),
+        fetched_coin_balance_block_number: String.to_integer(block_param),
+        hash: address_param
+      }
+      params = []
+      params = [change_param | params]
+
+      Chain.import(%{
+        addresses: %{params: params, with: :balance_changeset},
+        broadcast: :on_demand
+      })
+      send_resp(conn, :ok, %{"balance" => "updated"} |> Jason.encode!())
+    else
+      {:address_param, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Query parameter 'address' is required")
+
+      {:block_param, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Query parameter 'block' is required")
+
+      {:balance_param, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Query parameter 'balance' is required")
+    end
+  end
+
   def balancemulti(conn, params) do
     balance(conn, params, :balancemulti)
   end
@@ -805,6 +840,14 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
 
   defp fetch_address(params) do
     {:address_param, Map.fetch(params, "address")}
+  end
+
+  defp fetch_block(params) do
+    {:block_param, Map.fetch(params, "block")}
+  end
+
+  defp fetch_balance(params) do
+    {:balance_param, Map.fetch(params, "balance")}
   end
 
   defp to_address_hashes(address_param) when is_binary(address_param) do
