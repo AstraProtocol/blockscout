@@ -113,7 +113,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
          {:ok, address} <- Chain.hash_to_address(address_hash) do
 
       block_number_param = String.to_integer(block_param)
-      if block_number_param - address.fetched_coin_balance_block_number >= 10 do
+      if block_number_param - (address.fetched_coin_balance_block_number || 0) >= 10 do
         change_param = %{
           fetched_coin_balance: String.to_integer(balance_param),
           fetched_coin_balance_block_number: block_number_param,
@@ -223,7 +223,8 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
             [from_address: :smart_contract] => :optional,
             [to_address: :smart_contract] => :optional
           }
-        ] |> Keyword.merge(paging_options_token_transfer_list(params, options))
+        ]
+        |> Keyword.merge(paging_options_token_transfer_list(params, options))
 
       transactions_plus_one = Chain.address_to_transactions_with_rewards(address_hash, full_options)
       {transactions, next_page} = split_list_by_page(transactions_plus_one, options_with_defaults.page_size)
@@ -258,6 +259,11 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         conn
         |> put_status(200)
         |> render(:error, error: "Invalid address format")
+
+      {:address, :not_found} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Address not found")
     end
   end
 
@@ -1058,5 +1064,15 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
       nil -> 0
       token_balance -> token_balance.value
     end
+  end
+
+  defp current_filter(%{paging_options: paging_options} = params) do
+    params
+    |> Map.get("filter")
+    |> case do
+         "to" -> [direction: :to, paging_options: paging_options]
+         "from" -> [direction: :from, paging_options: paging_options]
+         _ -> [paging_options: paging_options]
+       end
   end
 end
