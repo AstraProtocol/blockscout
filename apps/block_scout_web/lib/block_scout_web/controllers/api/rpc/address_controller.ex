@@ -121,7 +121,17 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         addresses: %{params: params, with: :balance_changeset},
         broadcast: :on_demand
       })
-      send_resp(conn, :ok, %{"balance" => "updated"} |> Jason.encode!())
+      send_resp(conn,
+                :ok,
+                %{
+                  "message" => "OK",
+                  "result" => %{
+                    "address" => address_param,
+                    "balance" => balance_param
+                  },
+                  "status" => "1"
+                } |> Jason.encode!()
+              )
     else
       {:address_param, :error} ->
         conn
