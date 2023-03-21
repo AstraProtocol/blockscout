@@ -108,19 +108,26 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
   def update_balance(conn, params) do
     with {:address_param, {:ok, address_param}} <- fetch_address(params),
          {:block_param, {:ok, block_param}} <- fetch_block(params),
-         {:balance_param, {:ok, balance_param}} <- fetch_balance(params) do
-      change_param = %{
-        fetched_coin_balance: String.to_integer(balance_param),
-        fetched_coin_balance_block_number: String.to_integer(block_param),
-        hash: address_param
-      }
-      params = []
-      params = [change_param | params]
+         {:balance_param, {:ok, balance_param}} <- fetch_balance(params),
+         {:format, {:ok, address_hash}} <- to_address_hash(address_param),
+         {:ok, address} <- Chain.hash_to_address(address_hash) do
 
-      Chain.import(%{
-        addresses: %{params: params, with: :balance_changeset},
-        broadcast: :on_demand
-      })
+      block_number_param = String.to_integer(block_param)
+      if block_number_param - address.fetched_coin_balance_block_number >= 10 do
+        change_param = %{
+          fetched_coin_balance: String.to_integer(balance_param),
+          fetched_coin_balance_block_number: block_number_param,
+          hash: address_param
+        }
+        params = []
+        params = [change_param | params]
+
+        Chain.import(%{
+          addresses: %{params: params, with: :balance_changeset},
+          broadcast: :on_demand
+        })
+      end
+
       send_resp(conn,
                 :ok,
                 %{
@@ -147,6 +154,16 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         conn
         |> put_status(200)
         |> render(:error, error: "Query parameter 'balance' is required")
+
+      {:format, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Invalid address hash")
+
+      {:error, :not_found}  ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Address not found")
     end
   end
 
