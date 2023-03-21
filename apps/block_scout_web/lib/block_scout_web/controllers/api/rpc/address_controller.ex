@@ -224,6 +224,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
             [to_address: :smart_contract] => :optional
           }
         ]
+        |> Keyword.merge(current_filter(params))
         |> Keyword.merge(paging_options_token_transfer_list(params, options))
 
       transactions_plus_one = Chain.address_to_transactions_with_rewards(address_hash, full_options)
@@ -1066,13 +1067,13 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     end
   end
 
-  defp current_filter(%{paging_options: paging_options} = params) do
+  defp current_filter(params) do
     params
     |> Map.get("filter")
     |> case do
-         "to" -> [direction: :to, paging_options: paging_options]
-         "from" -> [direction: :from, paging_options: paging_options]
-         _ -> [paging_options: paging_options]
+         "to" -> [direction: :to]
+         "from" -> [direction: :from]
+         _ -> []
        end
   end
 end
