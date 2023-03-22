@@ -247,7 +247,8 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "success" => if(transaction.status == :ok, do: true, else: false),
       "error" => "#{transaction.error}",
       "createdContractAddressHash" => "#{transaction.created_contract_address_hash}",
-      "contractMethodName" => Chain.get_contract_method_name_by_input_data(transaction.input) || ""
+      "contractMethodName" => Chain.get_contract_method_name_by_input_data(transaction.input) || "",
+      "input" => "#{transaction.input}"
     }
   end
 

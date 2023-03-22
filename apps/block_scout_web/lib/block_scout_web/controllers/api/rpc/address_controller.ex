@@ -268,6 +268,79 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     end
   end
 
+  def txlistdeposit(conn, params) do
+    pagination_options = Helpers.put_pagination_options(%{}, params)
+
+    with {:address_param, {:ok, address_param}} <- fetch_address(params),
+         {:format, {:ok, address_hash}} <- to_address_hash(address_param),
+         {:address, :ok} <- {:address, Chain.check_address_exists(address_hash)} do
+
+      options_with_defaults =
+        pagination_options
+        |> Map.put_new(:page_number, 0)
+        |> Map.put_new(:page_size, 10)
+
+      options = %PagingOptions{
+        key: nil,
+        page_number: options_with_defaults.page_number,
+        page_size: options_with_defaults.page_size + 1
+      }
+
+      full_options =
+        [
+          necessity_by_association: %{
+            [created_contract_address: :names] => :optional,
+            [from_address: :names] => :optional,
+            [to_address: :names] => :optional,
+            :block => :optional,
+            [created_contract_address: :smart_contract] => :optional,
+            [from_address: :smart_contract] => :optional,
+            [to_address: :smart_contract] => :optional
+          }
+        ]
+        |> Keyword.merge(paging_options_token_transfer_list(params, options))
+
+      transactions_plus_one = Chain.address_to_deposit_transactions(address_hash, full_options)
+      {transactions, next_page} = split_list_by_page(transactions_plus_one, options_with_defaults.page_size)
+
+      if length(next_page) > 0 do
+        last_transaction = Enum.at(transactions, -1)
+        next_page_params = %{
+          "page" => get_next_page_number(options_with_defaults.page_number),
+          "offset" => options_with_defaults.page_size,
+          "block_number" => last_transaction.block_number,
+          "index" => last_transaction.index
+        }
+        render(conn, "txlist.json", %{
+          transactions: transactions,
+          has_next_page: true,
+          next_page_path: next_page_path(next_page_params)}
+        )
+      else
+        render(conn, "txlist.json", %{
+          transactions: transactions,
+          has_next_page: false,
+          next_page_path: ""}
+        )
+      end
+    else
+      {:address_param, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Query parameter 'address' is required")
+
+      {:format, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Invalid address format")
+
+      {:address, :not_found} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Address not found")
+    end
+  end
+
   def txlistinternal(conn, params) do
     case {Map.fetch(params, "txhash"), Map.fetch(params, "address")} do
       {:error, :error} ->

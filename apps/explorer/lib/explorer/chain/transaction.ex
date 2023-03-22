@@ -655,11 +655,16 @@ defmodule Explorer.Chain.Transaction do
     ]
   end
 
+  def deposit_transactions(query) do
+    {:ok, input} = Explorer.Chain.Data.load(<<>>)
+    where(query, [t], t.input == ^input)
+  end
+
   def not_pending_transactions(query) do
     where(query, [t], not is_nil(t.block_number))
   end
 
-  def not_dropped_or_replaced_transacions(query) do
+  def not_dropped_or_replaced_transactions(query) do
     where(query, [t], is_nil(t.error) or t.error != "dropped/replaced")
   end
 

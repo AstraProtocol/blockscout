@@ -419,6 +419,17 @@ defmodule Explorer.Chain do
     |> Enum.take(paging_options.page_size)
   end
 
+  def address_to_deposit_transactions(address_hash, options) do
+    paging_options = Keyword.get(options, :paging_options, @default_paging_options)
+
+    address_hash
+    |> address_to_deposit_transactions_tasks(options)
+    |> wait_for_address_transactions()
+    |> Enum.sort_by(&{&1.block_number, &1.index}, &>=/2)
+    |> Enum.dedup_by(& &1.hash)
+    |> Enum.take(paging_options.page_size)
+  end
+
   def address_to_mined_transactions_without_rewards(address_hash, options) do
     paging_options = Keyword.get(options, :paging_options, @default_paging_options)
 
@@ -458,10 +469,26 @@ defmodule Explorer.Chain do
 
     options
     |> address_to_transactions_tasks_query()
-    |> Transaction.not_dropped_or_replaced_transacions()
+    |> Transaction.not_dropped_or_replaced_transactions()
     |> where_block_number_in_period(from_block, to_block)
     |> join_associations(necessity_by_association)
     |> Transaction.matching_address_queries_list(direction, address_hash)
+    |> Enum.map(fn query -> Task.async(fn -> Repo.all(query) end) end)
+  end
+
+  defp address_to_deposit_transactions_tasks(address_hash, options) do
+    necessity_by_association = Keyword.get(options, :necessity_by_association, %{})
+
+    from_block = from_block(options)
+    to_block = to_block(options)
+
+    options
+    |> address_to_transactions_tasks_query()
+    |> Transaction.not_dropped_or_replaced_transactions()
+    |> Transaction.deposit_transactions()
+    |> where_block_number_in_period(from_block, to_block)
+    |> join_associations(necessity_by_association)
+    |> Transaction.matching_address_queries_list(:to, address_hash)
     |> Enum.map(fn query -> Task.async(fn -> Repo.all(query) end) end)
   end
 
