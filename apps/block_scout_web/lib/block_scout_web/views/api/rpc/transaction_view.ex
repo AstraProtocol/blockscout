@@ -3,6 +3,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
 
   alias BlockScoutWeb.API.RPC.RPCView
   alias Explorer.Chain
+  alias Explorer.Chain.Transaction
 
   def render("gettxinfo.json", %{
         transaction: transaction,
@@ -98,8 +99,23 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       "type" => transaction.type,
       "tokenTransfers" => Enum.map(transaction.token_transfers, &prepare_token_transfer/1),
       "logs" => Enum.map(logs, &prepare_log/1),
-      "revertReason" => "#{transaction.revert_reason}"
+      "revertReason" => "#{prepare_revert_reason(transaction)}"
     }
+  end
+
+  defp prepare_revert_reason(transaction) do
+    case Transaction.decoded_revert_reason(transaction, transaction.revert_reason) do
+      {:error, _contract_not_verified, candidates} when candidates != [] ->
+        {:ok, _method_id, text, _mapping} = Enum.at(candidates, 0)
+        text
+
+      {:ok, _method_id, text, _mapping} ->
+        text
+
+      _ ->
+        # hex
+        BlockScoutWeb.TransactionView.get_pure_transaction_revert_reason(transaction)
+    end
   end
 
   defp parse_gas_value(gas_field) do

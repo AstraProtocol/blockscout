@@ -20,7 +20,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
 
       transaction_updated =
         if (error == "Reverted" || error == "execution reverted") && !revert_reason do
-          %Transaction{transaction | revert_reason: Chain.fetch_tx_revert_reason(transaction)}
+          %Transaction{transaction | revert_reason: Chain.transaction_to_revert_reason(transaction)}
         else
           transaction
         end
@@ -56,7 +56,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
 
       transaction_updated =
         if (error == "Reverted" || error == "execution reverted") && !revert_reason do
-          %Transaction{transaction | revert_reason: Chain.fetch_tx_revert_reason(transaction)}
+          %Transaction{transaction | revert_reason: Chain.transaction_to_revert_reason(transaction)}
         else
           transaction
         end
