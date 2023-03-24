@@ -25,6 +25,22 @@ defmodule Explorer.SmartContract.Solidity.PublisherWorker do
     EventsPublisher.broadcast([{:contract_verification_result, {address_hash, result, conn}}], :on_demand)
   end
 
+  def perform({"flattened", %{"address_hash" => address_hash} = params, external_libraries, conn, uid}) do
+    VerificationStatus.insert_status(uid, :pending, address_hash)
+    result =
+      case Publisher.publish(address_hash, params, external_libraries) do
+        {:ok, _contract} = result ->
+          VerificationStatus.update_status(uid, :pass)
+          result
+
+        {:error, changeset} ->
+          VerificationStatus.update_status(uid, :fail)
+          {:error, changeset}
+      end
+
+    EventsPublisher.broadcast([{:contract_verification_result, {address_hash, result, conn}}], :on_demand)
+  end
+
   def perform({"multipart", %{"address_hash" => address_hash} = params, files_map, external_libraries, conn})
       when is_map(files_map) do
     result =

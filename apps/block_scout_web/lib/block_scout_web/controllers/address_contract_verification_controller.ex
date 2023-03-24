@@ -14,8 +14,6 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
   alias Explorer.SmartContract.Vyper.PublisherWorker, as: VyperPublisherWorker
   alias Explorer.ThirdPartyIntegrations.Sourcify
 
-  require Logger
-
   def new(conn, %{"address_id" => address_hash_string}) do
     if Chain.smart_contract_fully_verified?(address_hash_string) do
       address_contract_path =
@@ -79,10 +77,13 @@ defmodule BlockScoutWeb.AddressContractVerificationController do
     with {:params, {:ok, _}} <- {:params, fetch_verify_flattened_params(params)},
          {:ok, hash} <- validate_address_hash(address_hash),
          :ok <- Chain.check_address_exists(hash),
-         {:contract, :not_found} <- {:contract, Chain.check_verified_smart_contract_exists(hash)},
-         uid <- VerificationStatus.generate_uid(address_hash) do
+         {:contract, :not_found} <- {:contract, Chain.check_verified_smart_contract_exists(hash)} do
 
-      Que.add(SolidityPublisherWorker, {"flattened", smart_contract, external_libraries, uid})
+      uid = VerificationStatus.generate_uid(address_hash)
+      Que.add(
+        SolidityPublisherWorker,
+        {"flattened", smart_contract, external_libraries, conn, uid}
+      )
       send_resp(conn, :created, encode(%{guid: uid}))
     else
       {:params, {:error, error}} ->
