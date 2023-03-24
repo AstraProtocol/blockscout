@@ -8,6 +8,8 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
   alias Explorer.SmartContract.{CompilerVersion, Helper}
   alias Explorer.SmartContract.Solidity.Verifier
 
+  require Logger
+
   @doc """
   Evaluates smart contract authenticity and saves its details.
 
@@ -103,12 +105,15 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
         publish_smart_contract(address_hash, merged_params, abi)
 
       {:error, error} ->
-        {:error, unverified_smart_contract(address_hash, params, error, nil, true)}
+        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error}")
+        {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, nil)}
 
       {:error, error, error_message} ->
-        {:error, unverified_smart_contract(address_hash, params, error, error_message, true)}
+        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error_message}")
+        {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, error_message)}
 
       _ ->
+        Logger.info("Unable to verify smart contract: #{address_hash}, error: Unexpected error")
         {:error, unverified_smart_contract(address_hash, params, "Failed to verify", nil, true)}
     end
   end
