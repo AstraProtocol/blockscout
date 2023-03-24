@@ -466,13 +466,18 @@ defmodule Explorer.Chain.Transaction do
   end
 
   defp proccess_hex_revert_reason(hex_revert_reason, %__MODULE__{to_address: smart_contract, hash: hash}) do
-    case Integer.parse(hex_revert_reason, 16) do
-      {number, ""} ->
-        binary_revert_reason = :binary.encode_unsigned(number)
-        decoded_input_data(%Transaction{to_address: smart_contract, hash: hash, input: %{bytes: binary_revert_reason}})
-
+    case hex_revert_reason do
+      nil ->
+       ""
       _ ->
-        hex_revert_reason
+        case Integer.parse(hex_revert_reason, 16) do
+          {number, ""} ->
+            binary_revert_reason = :binary.encode_unsigned(number)
+            decoded_input_data(%Transaction{to_address: smart_contract, hash: hash, input: %{bytes: binary_revert_reason}})
+
+          _ ->
+            hex_revert_reason
+        end
     end
   end
 
