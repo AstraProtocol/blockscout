@@ -27,9 +27,9 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
 
   """
   def publish(address_hash, params, external_libraries \\ %{}) do
-    params_with_external_libaries = add_external_libraries(params, external_libraries)
+    params_with_external_libraries = add_external_libraries(params, external_libraries)
 
-    case Verifier.evaluate_authenticity(address_hash, params_with_external_libaries) do
+    case Verifier.evaluate_authenticity(address_hash, params_with_external_libraries) do
       {
         :ok,
         %{
@@ -57,21 +57,24 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
 
       {:ok, %{abi: abi, constructor_arguments: constructor_arguments}} ->
         params_with_constructor_arguments =
-          Map.put(params_with_external_libaries, "constructor_arguments", constructor_arguments)
+          Map.put(params_with_external_libraries, "constructor_arguments", constructor_arguments)
 
         publish_smart_contract(address_hash, params_with_constructor_arguments, abi)
 
       {:ok, %{abi: abi}} ->
-        publish_smart_contract(address_hash, params_with_external_libaries, abi)
+        publish_smart_contract(address_hash, params_with_external_libraries, abi)
 
       {:error, error} ->
-        {:error, unverified_smart_contract(address_hash, params_with_external_libaries, error, nil)}
+        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error}")
+        {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, nil)}
 
       {:error, error, error_message} ->
-        {:error, unverified_smart_contract(address_hash, params_with_external_libaries, error, error_message)}
+        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error_message}")
+        {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, error_message)}
 
       _ ->
-        {:error, unverified_smart_contract(address_hash, params_with_external_libaries, "Unexpected error", nil)}
+        Logger.info("Unable to verify smart contract: #{address_hash}, error: Unexpected error")
+        {:error, unverified_smart_contract(address_hash, params_with_external_libraries, "Unexpected error", nil)}
     end
   end
 
@@ -90,7 +93,7 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
          "optimization_runs" => _,
          "sources" => _
        } = result_params} ->
-        proccess_rust_verifier_response(result_params, address_hash)
+        process_rust_verifier_response(result_params, address_hash)
 
       {:ok, %{abi: abi, constructor_arguments: constructor_arguments}, additional_params} ->
         params_with_constructor_arguments =
@@ -105,23 +108,20 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
         publish_smart_contract(address_hash, merged_params, abi)
 
       {:error, error} ->
-        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error}")
-        {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, nil)}
+        {:error, unverified_smart_contract(address_hash, params, error, nil, true)}
 
       {:error, error, error_message} ->
-        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error_message}")
-        {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, error_message)}
+        {:error, unverified_smart_contract(address_hash, params, error, error_message, true)}
 
       _ ->
-        Logger.info("Unable to verify smart contract: #{address_hash}, error: Unexpected error")
         {:error, unverified_smart_contract(address_hash, params, "Failed to verify", nil, true)}
     end
   end
 
   def publish_with_multi_part_files(%{"address_hash" => address_hash} = params, external_libraries, files) do
-    params_with_external_libaries = add_external_libraries(params, external_libraries)
+    params_with_external_libraries = add_external_libraries(params, external_libraries)
 
-    case Verifier.evaluate_authenticity_via_multi_part_files(address_hash, params_with_external_libaries, files) do
+    case Verifier.evaluate_authenticity_via_multi_part_files(address_hash, params_with_external_libraries, files) do
       {:ok,
        %{
          "abi" => _,
@@ -135,7 +135,7 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
          "optimization_runs" => _,
          "sources" => _
        } = result_params} ->
-        proccess_rust_verifier_response(result_params, address_hash)
+        process_rust_verifier_response(result_params, address_hash)
 
       {:error, error} ->
         {:error, unverified_smart_contract(address_hash, params, error, nil, true)}
@@ -145,7 +145,7 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
     end
   end
 
-  def proccess_rust_verifier_response(
+  def process_rust_verifier_response(
         %{
           "abi" => abi_string,
           "compiler_version" => _,
@@ -230,7 +230,7 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
         nil
       end
 
-    prepared_external_libraries = prepare_external_libraies(params["external_libraries"])
+    prepared_external_libraries = prepare_external_libraries(params["external_libraries"])
 
     compiler_version = CompilerVersion.get_strict_compiler_version(:solc, params["compiler_version"])
 
@@ -254,9 +254,9 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
     }
   end
 
-  defp prepare_external_libraies(nil), do: []
+  defp prepare_external_libraries(nil), do: []
 
-  defp prepare_external_libraies(map) do
+  defp prepare_external_libraries(map) do
     map
     |> Enum.map(fn {key, value} ->
       %{name: key, address_hash: value}
