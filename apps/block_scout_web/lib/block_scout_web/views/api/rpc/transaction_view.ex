@@ -117,6 +117,8 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
           # hex
           BlockScoutWeb.TransactionView.get_pure_transaction_revert_reason(transaction)
       end
+    else
+      ""
     end
   end
 
