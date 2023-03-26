@@ -104,17 +104,19 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
   end
 
   defp prepare_revert_reason(transaction) do
-    case Transaction.decoded_revert_reason(transaction, transaction.revert_reason) do
-      {:error, _contract_not_verified, candidates} when candidates != [] ->
-        {:ok, _method_id, text, _mapping} = Enum.at(candidates, 0)
-        text
+    if(transaction.status != :ok) do
+      case Transaction.decoded_revert_reason(transaction, transaction.revert_reason) do
+        {:error, _contract_not_verified, candidates} when candidates != [] ->
+          {:ok, _method_id, text, _mapping} = Enum.at(candidates, 0)
+          text
 
-      {:ok, _method_id, text, _mapping} ->
-        text
+        {:ok, _method_id, text, _mapping} ->
+          text
 
-      _ ->
-        # hex
-        BlockScoutWeb.TransactionView.get_pure_transaction_revert_reason(transaction)
+        _ ->
+          # hex
+          BlockScoutWeb.TransactionView.get_pure_transaction_revert_reason(transaction)
+      end
     end
   end
 
