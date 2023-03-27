@@ -66,6 +66,9 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
 
   defp prepare_transaction(transaction, block_height, logs) do
     {_, fee_value} = Chain.fee(transaction, :wei)
+    creator = BlockScoutWeb.API.RPC.AddressView.prepare_creator(transaction.to_address)
+    isInteractWithContract =
+      if BlockScoutWeb.API.RPC.AddressView.get_address_type(creator) == "contractaddress", do: true, else: false
     %{
       "blockHeight" => transaction.block_number,
       "blockHash" => "#{transaction.block.hash}",
@@ -79,6 +82,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
       "fromAddressName" => Chain.get_address_name(transaction.from_address),
       "to" => "#{transaction.to_address_hash}",
       "toAddressName" => Chain.get_address_name(transaction.to_address),
+      "isInteractWithContract" => isInteractWithContract,
       "value" => transaction.value.value,
       "input" => "#{transaction.input}",
       "gasLimit" => transaction.gas,

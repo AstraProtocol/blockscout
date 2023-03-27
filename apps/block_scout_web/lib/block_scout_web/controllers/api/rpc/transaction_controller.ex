@@ -254,6 +254,9 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
              [token_transfers: :token_contract_address] => :optional,
              [to_address: :smart_contract] => :optional,
              [to_address: :names] => :optional,
+             [to_address: :contracts_creation_internal_transaction] => :optional,
+             [to_address: :token] => :optional,
+             [to_address: :contracts_creation_transaction] => :optional,
              [from_address: :names] => :optional,
              [created_contract_address: :names] => :optional,
              block: :required
@@ -275,6 +278,9 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
              [token_transfers: :token_contract_address] => :optional,
              [to_address: :smart_contract] => :optional,
              [to_address: :names] => :optional,
+             [to_address: :contracts_creation_internal_transaction] => :optional,
+             [to_address: :token] => :optional,
+             [to_address: :contracts_creation_transaction] => :optional,
              [from_address: :names] => :optional,
              [created_contract_address: :names] => :optional,
              block: :required

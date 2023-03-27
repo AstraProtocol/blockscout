@@ -413,7 +413,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     end
   end
 
-  defp prepare_creator(address_detail) do
+  def prepare_creator(address_detail) do
     if is_nil(address_detail.contracts_creation_internal_transaction) do
       to_string(address_detail.contracts_creation_transaction &&
         address_detail.contracts_creation_transaction.from_address_hash
@@ -430,7 +430,7 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     end
   end
 
-  defp get_address_type(creator) do
+  def get_address_type(creator) do
     if creator == "" do
       "address"
     else
