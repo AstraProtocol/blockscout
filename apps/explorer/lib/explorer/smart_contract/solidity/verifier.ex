@@ -373,9 +373,11 @@ defmodule Explorer.SmartContract.Solidity.Verifier do
         {:error, :deployed_bytecode}
 
       solc_local != solc_bc ->
+        Logger.info("compiler local != compiler bytecode")
         {:error, :compiler_version}
 
       !String.contains?(bc_creation_tx_input_without_meta, local_bytecode_without_meta) ->
+        Logger.info("deployed bytecode not match with local bytecode")
         {:error, :generated_bytecode}
 
       bc_replaced_local == "" && !has_constructor_with_params? ->
