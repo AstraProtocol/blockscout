@@ -65,15 +65,15 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
         publish_smart_contract(address_hash, params_with_external_libraries, abi)
 
       {:error, error} ->
-        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error}")
+        Logger.info("Unable to verify smart contract using flattened: #{address_hash}, error: #{error}")
         {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, nil)}
 
       {:error, error, error_message} ->
-        Logger.info("Unable to verify smart contract: #{address_hash}, error: #{error_message}")
+        Logger.info("Unable to verify smart contract using flattened: #{address_hash}, error: #{error_message}")
         {:error, unverified_smart_contract(address_hash, params_with_external_libraries, error, error_message)}
 
       _ ->
-        Logger.info("Unable to verify smart contract: #{address_hash}, error: Unexpected error")
+        Logger.info("Unable to verify smart contract using flattened: #{address_hash}, error: Unexpected error")
         {:error, unverified_smart_contract(address_hash, params_with_external_libraries, "Unexpected error", nil)}
     end
   end
@@ -108,12 +108,15 @@ defmodule Explorer.SmartContract.Solidity.Publisher do
         publish_smart_contract(address_hash, merged_params, abi)
 
       {:error, error} ->
+        Logger.info("Unable to verify smart contract using standard json input: #{address_hash}, error: #{error}")
         {:error, unverified_smart_contract(address_hash, params, error, nil, true)}
 
       {:error, error, error_message} ->
+        Logger.info("Unable to verify smart contract using standard json input: #{address_hash}, error: #{error_message}")
         {:error, unverified_smart_contract(address_hash, params, error, error_message, true)}
 
       _ ->
+        Logger.info("Unable to verify smart contract using standard json input: #{address_hash}, error: Failed to verify")
         {:error, unverified_smart_contract(address_hash, params, "Failed to verify", nil, true)}
     end
   end
