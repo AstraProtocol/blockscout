@@ -15,6 +15,12 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
     contractName = Chain.get_address_name(address_detail)
     creationTransaction = prepare_creation_transaction(address_detail)
     creator = prepare_creator(address_detail)
+    {implementation_address_hash, implementation_address_name} =
+      if address_detail.smart_contract && address_detail.smart_contract.abi do
+        Chain.get_implementation_address_hash(address_detail.hash, address_detail.smart_contract.abi)
+      else
+        {"", ""}
+      end
     data = %{
       "contractName" => contractName,
       "balance" => (address_detail.fetched_coin_balance && address_detail.fetched_coin_balance.value) || "0",
@@ -22,6 +28,8 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "tokenSymbol" => to_string(address_detail.token && address_detail.token.symbol),
       "creationTransaction" => creationTransaction,
       "creator" => creator,
+      "implementationAddressName" => implementation_address_name || "",
+      "implementationAddressHash" => implementation_address_hash || "",
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
       "type" => get_address_type(creator),
       "verified" => verified
