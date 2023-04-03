@@ -29,7 +29,8 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
       "creationTransaction" => creationTransaction,
       "creator" => creator,
       "implementationAddressName" => implementation_address_name || "",
-      "implementationAddressHash" => implementation_address_hash || "",
+      "implementationAddressHash" =>
+        if(implementation_address_hash == "0x0000000000000000000000000000000000000000", do: "", else: implementation_address_hash || ""),
       "lastBalanceUpdate" => address_detail.fetched_coin_balance_block_number,
       "type" => get_address_type(creator),
       "verified" => verified
