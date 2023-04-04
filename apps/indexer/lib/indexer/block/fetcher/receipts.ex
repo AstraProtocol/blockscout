@@ -41,9 +41,11 @@ defmodule Indexer.Block.Fetcher.Receipts do
         {transaction_hash, receipt_params}
       end)
 
-    Enum.map(transactions_params, fn %{hash: transaction_hash} = transaction_params ->
+    Enum.map(transactions_params, fn %{hash: transaction_hash, block_number: block_number} = transaction_params ->
       receipts_params = Map.fetch!(transaction_hash_to_receipt_params, transaction_hash)
       merged_params = Map.merge(transaction_params, receipts_params)
+
+      Kaffe.Producer.produce_sync("evm-txs", "#{block_number}", Poison.encode!(merged_params))
 
       if transaction_params[:created_contract_address_hash] && is_nil(receipts_params[:created_contract_address_hash]) do
         Map.put(merged_params, :created_contract_address_hash, transaction_params[:created_contract_address_hash])

@@ -20,6 +20,12 @@ config :logger, :indexer,
        block_number step count error_count shrunk import_id transaction_id)a,
   metadata_filter: [application: :indexer]
 
+config :kaffe,
+  producer: [
+    endpoints: [localhost: 9092], # [hostname: port]
+    topics: ["evm-txs"],
+  ]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
