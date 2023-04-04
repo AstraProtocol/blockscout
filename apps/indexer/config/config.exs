@@ -20,10 +20,18 @@ config :logger, :indexer,
        block_number step count error_count shrunk import_id transaction_id)a,
   metadata_filter: [application: :indexer]
 
+kafka_topic = System.get_env("KAFKA_TOPIC") || "evm-txs"
+kafka_host = System.get_env("KAFKA_HOST") || "localhost"
+kafka_port = case Integer.parse(System.get_env("KAFKA_PORT") || "9092", 10) do
+  {port, _} ->
+    port
+  _ ->
+    9092
+end
 config :kaffe,
   producer: [
-    endpoints: [localhost: 9092], # [hostname: port]
-    topics: ["evm-txs"],
+    endpoints: [{to_charlist(kafka_host), kafka_port}], # [hostname: port]
+    topics: [kafka_topic],
   ]
 
 # Import environment specific config. This must remain at the bottom
