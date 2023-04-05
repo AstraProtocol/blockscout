@@ -21,16 +21,21 @@ config :logger, :indexer,
   metadata_filter: [application: :indexer]
 
 kafka_topic = System.get_env("KAFKA_TOPIC") || "evm-txs"
-kafka_host = System.get_env("KAFKA_HOST") || "localhost"
-kafka_port = case Integer.parse(System.get_env("KAFKA_PORT") || "9092", 10) do
-  {port, _} ->
-    port
+kafka_brokers = System.get_env("KAFKA_BROKERS")
+endpoints = case kafka_brokers do
+  nil ->
+    [{String.to_charlist("localhost"), 9092}]
   _ ->
-    9092
+    list_urls = kafka_brokers |> String.split(",")
+    Enum.map(list_urls, fn url ->
+      [ip, port] = url |> String.trim |> String.split(":")
+      {ip |> String.to_charlist(), port |> String.to_integer()}
+    end)
 end
+
 config :kaffe,
   producer: [
-    endpoints: [{to_charlist(kafka_host), kafka_port}], # [hostname: port]
+    endpoints: endpoints,
     topics: [kafka_topic],
   ]
 
