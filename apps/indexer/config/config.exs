@@ -37,6 +37,9 @@ config :kaffe,
   producer: [
     endpoints: endpoints,
     topics: [kafka_topic],
+
+    # optional
+    partition_strategy: :md5,
   ]
 
 # Import environment specific config. This must remain at the bottom
