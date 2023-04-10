@@ -40,6 +40,12 @@ config :kaffe,
 
     # optional
     partition_strategy: :md5,
+    ssl: true,
+    sasl: %{
+      mechanism: :plain,
+      login: System.get_env("KAFFE_PRODUCER_USER"),
+      password: System.get_env("KAFFE_PRODUCER_PASSWORD")
+    }
   ]
 
 # Import environment specific config. This must remain at the bottom
