@@ -50,8 +50,8 @@ config :kaffe,
     ssl: true,
     sasl: %{
       mechanism: :scram_sha_256,
-      login: System.get_env("KAFKA_PRODUCER_USER"),
-      password: System.get_env("KAFKA_PRODUCER_PASSWORD")
+      login: System.get_env("KAFKA_USER"),
+      password: System.get_env("KAFKA_PASSWORD")
     }
   ]
 
