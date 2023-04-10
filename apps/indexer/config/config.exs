@@ -20,7 +20,14 @@ config :logger, :indexer,
        block_number step count error_count shrunk import_id transaction_id)a,
   metadata_filter: [application: :indexer]
 
-kafka_topic = System.get_env("KAFKA_TOPIC") || "evm-txs"
+kafka_topics = System.get_env("KAFKA_TOPICS")
+topics = case kafka_topics do
+  nil ->
+    ["evm-txs"]
+  _ ->
+    kafka_topics |> String.split(",", trim: true)
+end
+
 kafka_brokers = System.get_env("KAFKA_BROKERS")
 endpoints = case kafka_brokers do
   nil ->
@@ -36,16 +43,16 @@ end
 config :kaffe,
   producer: [
     endpoints: endpoints,
-    topics: [kafka_topic],
+    topics: kafka_topics,
 
     # optional
     partition_strategy: :md5,
-    ssl: true,
-    sasl: %{
-      mechanism: :plain,
-      login: System.get_env("KAFKA_PRODUCER_USER"),
-      password: System.get_env("KAFKA_PRODUCER_PASSWORD")
-    }
+    #ssl: true,
+    #sasl: %{
+    #  mechanism: :plain,
+    #  login: System.get_env("KAFKA_PRODUCER_USER"),
+    #  password: System.get_env("KAFKA_PRODUCER_PASSWORD")
+    #}
   ]
 
 # Import environment specific config. This must remain at the bottom
