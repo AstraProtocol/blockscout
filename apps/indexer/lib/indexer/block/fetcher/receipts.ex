@@ -46,6 +46,7 @@ defmodule Indexer.Block.Fetcher.Receipts do
       merged_params = Map.merge(transaction_params, receipts_params)
 
       topic = System.get_env("KAFKA_TOPICS") |> String.split(",", trim: true) |> hd
+      Logger.info("Produce evm tx to topic: #{topic}, evm tx: #{Poison.encode!(merged_params)}")
       Kaffe.Producer.produce_sync(topic, "#{block_number}", Poison.encode!(merged_params))
 
       if transaction_params[:created_contract_address_hash] && is_nil(receipts_params[:created_contract_address_hash]) do
