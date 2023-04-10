@@ -43,8 +43,8 @@ config :kaffe,
     ssl: true,
     sasl: %{
       mechanism: :plain,
-      login: System.get_env("KAFFE_PRODUCER_USER"),
-      password: System.get_env("KAFFE_PRODUCER_PASSWORD")
+      login: System.get_env("KAFKA_PRODUCER_USER"),
+      password: System.get_env("KAFKA_PRODUCER_PASSWORD")
     }
   ]
 
