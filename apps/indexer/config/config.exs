@@ -60,7 +60,7 @@ config :brod,
     kafka_client: [
       endpoints: endpoints,
       ssl: [
-        verify: :verify_peer,
+        verify: :verify_none,
         cacertfile: "ca-dev.crt",
         depth: 3,
         customize_hostname_check: [
