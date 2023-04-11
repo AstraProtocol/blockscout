@@ -126,13 +126,15 @@ defmodule Indexer.Block.Fetcher do
       :timer.tc(fn -> EthereumJSONRPC.fetch_blocks_by_range(range, json_rpc_named_arguments) end)
 
     with {:blocks,
-          {:ok,
-           %Blocks{
-             blocks_params: blocks_params,
-             transactions_params: transactions_params_without_receipts,
-             block_second_degree_relations_params: block_second_degree_relations_params,
-             errors: blocks_errors
-           }}} <- {:blocks, fetched_blocks},
+           {:ok,
+             %Blocks{
+               blocks_params: blocks_params,
+               transactions_params: transactions_params_without_receipts,
+               block_second_degree_relations_params: block_second_degree_relations_params,
+               errors: blocks_errors
+             }
+           }
+         } <- {:blocks, fetched_blocks},
          blocks = TransformBlocks.transform_blocks(blocks_params),
          cosmos_hash_params = CosmosHash.get_cosmos_hash_params_by_range(range),
          {:receipts, {:ok, receipt_params}} <- {:receipts, Receipts.fetch(state, transactions_params_without_receipts)},
