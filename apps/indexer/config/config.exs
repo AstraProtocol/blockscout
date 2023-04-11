@@ -55,26 +55,6 @@ config :kaffe,
     }
   ]
 
-config :brod,
-  clients: [
-    kafka_client: [
-      endpoints: endpoints,
-      ssl: [
-        verify: :verify_none,
-        cacertfile: "ca-dev.crt",
-        depth: 3,
-        customize_hostname_check: [
-          match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
-        ],
-      ],
-      sasl: {
-        :scram_sha_256,
-        System.get_env("KAFKA_USER"),
-        System.get_env("KAFKA_PASSWORD")
-      }
-    ]
-  ]
-
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
