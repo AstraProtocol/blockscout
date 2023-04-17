@@ -347,22 +347,74 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         render(conn, :error, error: "Query parameter txhash or address is required")
 
       {{:ok, txhash_param}, :error} ->
-        txlistinternal(conn, txhash_param, :txhash)
+        txlistinternal(conn, params, txhash_param, :txhash)
 
       {:error, {:ok, address_param}} ->
         txlistinternal(conn, params, address_param, :address)
     end
   end
 
-  def txlistinternal(conn, txhash_param, :txhash) do
+  def txlistinternal(conn, params, txhash_param, :txhash) do
+    pagination_options = Helpers.put_pagination_options(%{}, params)
+
     with {:format, {:ok, transaction_hash}} <- to_transaction_hash(txhash_param),
-         {:ok, internal_transactions} <- list_internal_transactions(transaction_hash) do
-      render(conn, :txlistinternal, %{internal_transactions: internal_transactions})
+         :ok <- Chain.check_transaction_exists(transaction_hash) do
+
+      options_with_defaults =
+        pagination_options
+        |> Map.put_new(:page_number, 0)
+        |> Map.put_new(:page_size, 50)
+
+      options = %PagingOptions{
+        key: nil,
+        page_number: options_with_defaults.page_number,
+        page_size: options_with_defaults.page_size + 1
+      }
+
+      full_options =
+        [
+          necessity_by_association: %{
+            [created_contract_address: :names] => :optional,
+            [from_address: :names] => :optional,
+            [to_address: :names] => :optional,
+            [transaction: :block] => :optional,
+            [created_contract_address: :smart_contract] => :optional,
+            [from_address: :smart_contract] => :optional,
+            [to_address: :smart_contract] => :optional
+          }
+        ] |> Keyword.merge(paging_options_list_internal_transactions(params, options))
+
+      internal_transactions_plus_one = Chain.transaction_to_internal_transactions(transaction_hash, full_options)
+      {internal_transactions, next_page} =
+        split_list_by_page(internal_transactions_plus_one, options_with_defaults.page_size)
+
+      if length(next_page) > 0 do
+        last_internal_transaction = Enum.at(internal_transactions, -1)
+        next_page_params = %{
+          "page" => get_next_page_number(options_with_defaults.page_number),
+          "limit" => options_with_defaults.page_size,
+          "block_number" => last_internal_transaction.block_number,
+          "transaction_index" => last_internal_transaction.transaction_index,
+          "index" => last_internal_transaction.index
+        }
+
+        render(conn, "txlistinternalpagination.json", %{
+          internal_transactions: internal_transactions,
+          has_next_page: true,
+          next_page_path: next_page_path(next_page_params)}
+        )
+      else
+        render(conn, "txlistinternalpagination.json", %{
+          internal_transactions: internal_transactions,
+          has_next_page: false,
+          next_page_path: ""}
+        )
+      end
     else
       {:format, :error} ->
         render(conn, :error, error: "Invalid txhash format")
 
-      {:error, :not_found} ->
+      :error ->
         render(conn, :error, error: "No internal transactions found", data: [])
     end
   end
@@ -410,13 +462,13 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
           "index" => last_internal_transaction.index
         }
 
-        render(conn, "txlistinternalbyaddress.json", %{
+        render(conn, "txlistinternalpagination.json", %{
           internal_transactions: internal_transactions,
           has_next_page: true,
           next_page_path: next_page_path(next_page_params)}
         )
       else
-        render(conn, "txlistinternalbyaddress.json", %{
+        render(conn, "txlistinternalpagination.json", %{
           internal_transactions: internal_transactions,
           has_next_page: false,
           next_page_path: ""}
@@ -1109,13 +1161,6 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
     case Etherscan.list_pending_transactions(address_hash, options) do
       [] -> {:error, :not_found}
       pending_transactions -> {:ok, pending_transactions}
-    end
-  end
-
-  defp list_internal_transactions(transaction_hash) do
-    case Chain.get_internal_transactions_by_transaction_hash(transaction_hash) do
-      [] -> {:error, :not_found}
-      internal_transactions -> {:ok, internal_transactions}
     end
   end
 
