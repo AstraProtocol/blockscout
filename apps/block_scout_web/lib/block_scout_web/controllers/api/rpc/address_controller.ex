@@ -392,7 +392,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         last_internal_transaction = Enum.at(internal_transactions, -1)
         next_page_params = %{
           "page" => get_next_page_number(options_with_defaults.page_number),
-          "limit" => options_with_defaults.page_size,
+          "offset" => options_with_defaults.page_size,
           "block_number" => last_internal_transaction.block_number,
           "transaction_index" => last_internal_transaction.transaction_index,
           "index" => last_internal_transaction.index
