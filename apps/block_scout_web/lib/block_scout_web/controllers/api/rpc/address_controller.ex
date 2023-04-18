@@ -665,7 +665,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         |> Map.put_new(:page_size, 10)
 
       options = %PagingOptions{
-        key: nil,
+        key: params["type"],
         page_number: options_with_defaults.page_number,
         page_size: options_with_defaults.page_size + 1
       }

@@ -4941,6 +4941,14 @@ defmodule Explorer.Chain do
     )
   end
 
+  def page_current_token_balances(query, paging_options: %PagingOptions{key: type}) do
+    where(
+      query,
+      [ctb, t],
+      t.type == ^type
+    )
+  end
+
   defp page_verified_contracts(query, %PagingOptions{key: nil}), do: query
 
   defp page_verified_contracts(query, %PagingOptions{key: {id}}) do
