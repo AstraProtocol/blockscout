@@ -4941,14 +4941,6 @@ defmodule Explorer.Chain do
     )
   end
 
-  def page_current_token_balances(query, paging_options: %PagingOptions{key: type}) do
-    where(
-      query,
-      [ctb, t],
-      t.type == ^type
-    )
-  end
-
   defp page_verified_contracts(query, %PagingOptions{key: nil}), do: query
 
   defp page_verified_contracts(query, %PagingOptions{key: {id}}) do
@@ -5357,6 +5349,15 @@ defmodule Explorer.Chain do
   def fetch_last_token_balances(address_hash, paging_options) do
     address_hash
     |> CurrentTokenBalance.last_token_balances(paging_options)
+    |> preload(:token)
+    |> page_current_token_balances(paging_options)
+    |> Repo.all()
+  end
+
+  @spec fetch_last_token_balances_filter_type(Hash.Address.t(), [paging_options], binary()) :: []
+  def fetch_last_token_balances_filter_type(address_hash, paging_options, type) do
+    address_hash
+    |> CurrentTokenBalance.last_token_balances_filter_type(paging_options, type)
     |> preload(:token)
     |> page_current_token_balances(paging_options)
     |> Repo.all()

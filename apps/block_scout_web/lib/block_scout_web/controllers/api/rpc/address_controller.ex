@@ -653,7 +653,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
   end
 
   def tokenlist(conn, params) do
-    pagination_options = Helpers.put_pagination_options(%{}, params)
+    pagination_options = Helpers.put_pagination_api_options(%{}, params)
 
     with {:address_param, {:ok, address_param}} <- fetch_address(params),
          {:format, {:ok, address_hash}} <- to_address_hash(address_param),
@@ -665,14 +665,14 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         |> Map.put_new(:page_size, 10)
 
       options = %PagingOptions{
-        key: params["type"],
+        key: nil,
         page_number: options_with_defaults.page_number,
         page_size: options_with_defaults.page_size + 1
       }
 
       token_balances_plus_one =
         address_hash
-        |> Chain.fetch_last_token_balances(paging_options_token_list(params, options))
+        |> Chain.fetch_last_token_balances_filter_type(paging_options_token_list(params, options), params["type"])
         |> Market.add_price()
 
       {token_balances, next_page} = split_list_by_page(token_balances_plus_one, options_with_defaults.page_size)
@@ -681,7 +681,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
         {%Address.CurrentTokenBalance{value: value, token: token}, _} = Enum.at(token_balances, -1)
         next_page_params = %{
           "page" => get_next_page_number(options_with_defaults.page_number),
-          "offset" => options_with_defaults.page_size,
+          "limit" => options_with_defaults.page_size,
           "token_name" => token.name,
           "token_type" => token.type,
           "value" => to_string(value)
