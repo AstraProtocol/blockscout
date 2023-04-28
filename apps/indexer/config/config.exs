@@ -43,13 +43,15 @@ end
 kafka_authen_type = System.get_env("KAFKA_AUTHEN_TYPE")
 sasl = case kafka_authen_type do
   "SASL" ->
-    %{
-      mechanism: :scram_sha_256,
-      login: System.get_env("KAFKA_USER"),
-      password: System.get_env("KAFKA_PASSWORD")
-    }
+    [sasl:
+      %{
+        mechanism: :scram_sha_256,
+        login: System.get_env("KAFKA_USER"),
+        password: System.get_env("KAFKA_PASSWORD")
+      }
+    ]
   _ ->
-    nil
+    []
 end
 
 ssl = case kafka_authen_type do
@@ -67,24 +69,29 @@ ssl = case kafka_authen_type do
         nil
     end
     if !is_nil(cert) and !is_nil(key) do
-      [cert: cert, key: key]
+      [
+        ssl: [
+          cert: cert,
+          key: key
+        ]
+      ]
     else
       []
     end
   _ ->
-    true
+    [ssl: true]
 end
 
-config :kaffe,
-  producer: [
-    endpoints: endpoints,
-    topics: kafka_topics,
+producer = [
+  endpoints: endpoints,
+  topics: kafka_topics,
 
-    # optional
-    partition_strategy: :md5,
-    ssl: ssl,
-    sasl: sasl
-  ]
+  # optional
+  partition_strategy: :md5
+]
+
+config :kaffe,
+  producer: producer ++ ssl ++ sasl
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
