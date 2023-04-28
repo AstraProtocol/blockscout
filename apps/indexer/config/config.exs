@@ -40,6 +40,41 @@ endpoints = case kafka_brokers do
     end)
 end
 
+kafka_authen_type = System.get_env("KAFKA_AUTHEN_TYPE")
+sasl = case kafka_authen_type do
+  "SASL" ->
+    %{
+      mechanism: :scram_sha_256,
+      login: System.get_env("KAFKA_USER"),
+      password: System.get_env("KAFKA_PASSWORD")
+    }
+  _ ->
+    nil
+end
+
+ssl = case kafka_authen_type do
+  "SSL" ->
+    cert = case File.read("/certs/blockscout-worker.kafka.prod/tls.crt") do
+      {:ok, cert} ->
+        cert
+      _ ->
+        nil
+    end
+    key = case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
+      {:ok, key} ->
+        key
+      _ ->
+        nil
+    end
+    if !is_nil(cert) and !is_nil(key) do
+      [cert: cert, key: key]
+    else
+      []
+    end
+  _ ->
+    true
+end
+
 config :kaffe,
   producer: [
     endpoints: endpoints,
@@ -47,12 +82,8 @@ config :kaffe,
 
     # optional
     partition_strategy: :md5,
-    ssl: true,
-    sasl: %{
-      mechanism: :scram_sha_256,
-      login: System.get_env("KAFKA_USER"),
-      password: System.get_env("KAFKA_PASSWORD")
-    }
+    ssl: ssl,
+    sasl: sasl
   ]
 
 # Import environment specific config. This must remain at the bottom
