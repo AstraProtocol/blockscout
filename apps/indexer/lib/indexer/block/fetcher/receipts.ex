@@ -55,10 +55,12 @@ defmodule Indexer.Block.Fetcher.Receipts do
     case txs do
       [_|_] ->
         Task.start(fn ->
-          topic = System.get_env("KAFKA_TOPICS") |> String.split(",", trim: true) |> hd
+          topics = System.get_env("KAFKA_TOPICS") |> String.split(",", trim: true)
           json_txs = Poison.encode!(txs)
-          Logger.info("Produce evm txs to topic: #{topic}, evm txs: #{json_txs}")
-          Kaffe.Producer.produce_sync(topic, "#{Enum.at(txs, 0).block_number}", json_txs)
+          for topic <- topics do
+            Logger.info("Produce evm txs to topic: #{topic}, evm txs: #{json_txs}")
+            Kaffe.Producer.produce_sync(topic, "#{Enum.at(txs, 0).block_number}", json_txs)
+          end
         end)
         txs
       _ ->
