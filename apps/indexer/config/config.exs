@@ -56,15 +56,15 @@ end
 
 ssl = case kafka_authen_type do
   "SSL" ->
-    cert = case File.read("/certs/blockscout-worker.kafka.prod/tls.crt") do
-      {:ok, cert} ->
-        cert
+    cert = case File.read("./certs/blockscout-worker.kafka.prod/tls.crt") do
+      {:ok, read_cert} ->
+        read_cert
       _ ->
         nil
     end
-    key = case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
-      {:ok, key} ->
-        key
+    key = case File.read("./certs/blockscout-worker.kafka.prod/tls.key") do
+      {:ok, read_key} ->
+        read_key
       _ ->
         nil
     end
@@ -79,19 +79,28 @@ ssl = case kafka_authen_type do
       []
     end
   _ ->
-    [ssl: true]
+    []
 end
 
-producer = [
+producer_tmp = [
   endpoints: endpoints,
-  topics: kafka_topics,
+  topics: topics,
 
   # optional
   partition_strategy: :md5
 ]
 
+producer = case kafka_authen_type do
+  "SSL" ->
+    producer_tmp ++ ssl
+  "SASL" ->
+    producer_tmp ++ sasl ++ [ssl: true]
+  _ ->
+    producer_tmp
+end
+
 config :kaffe,
-  producer: producer ++ ssl ++ sasl
+  producer: producer
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
