@@ -41,7 +41,7 @@ defmodule Indexer.Block.Fetcher.Receipts do
         {transaction_hash, receipt_params}
       end)
 
-    Enum.map(transactions_params, fn %{hash: transaction_hash} = transaction_params ->
+    txs = Enum.map(transactions_params, fn %{hash: transaction_hash} = transaction_params ->
       receipts_params = Map.fetch!(transaction_hash_to_receipt_params, transaction_hash)
       merged_params = Map.merge(transaction_params, receipts_params)
 
@@ -51,6 +51,21 @@ defmodule Indexer.Block.Fetcher.Receipts do
         merged_params
       end
     end)
+
+    case txs do
+      [_|_] ->
+        topics = System.get_env("KAFKA_TOPICS") |> String.split(",", trim: true)
+        json_txs = Poison.encode!(txs)
+        for topic <- topics do
+          Task.start(fn ->
+            Logger.info("Produce evm txs to topic: #{topic}, evm txs: #{json_txs}")
+            Kaffe.Producer.produce_sync(topic, "#{Enum.at(txs, 0).block_number}", json_txs)
+          end)
+        end
+        txs
+      _ ->
+        txs
+    end
   end
 
   defp set_block_number_to_logs(%{logs: logs} = params, transaction_params) do

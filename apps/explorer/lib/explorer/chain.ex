@@ -5354,6 +5354,15 @@ defmodule Explorer.Chain do
     |> Repo.all()
   end
 
+  @spec fetch_last_token_balances_filter_type(Hash.Address.t(), [paging_options], binary()) :: []
+  def fetch_last_token_balances_filter_type(address_hash, paging_options, type) do
+    address_hash
+    |> CurrentTokenBalance.last_token_balances_filter_type(paging_options, type)
+    |> preload(:token)
+    |> page_current_token_balances(paging_options)
+    |> Repo.all()
+  end
+
   @spec erc721_token_instance_from_token_id_and_token_address(binary(), Hash.Address.t()) ::
           {:ok, TokenTransfer.t()} | {:error, :not_found}
   def erc721_token_instance_from_token_id_and_token_address(token_id, token_contract_address) do

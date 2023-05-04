@@ -21,7 +21,7 @@ defmodule Indexer.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :kaffe],
       mod: {Indexer.Application, []}
     ]
   end
@@ -55,7 +55,9 @@ defmodule Indexer.MixProject do
       # Tracing
       {:spandex, "~> 3.0"},
       # `:spandex` integration with Datadog
-      {:spandex_datadog, "~> 1.0"}
+      {:spandex_datadog, "~> 1.0"},
+      # Kafka integration
+      {:kaffe, "~> 1.9"}
     ]
   end
 

@@ -10,6 +10,12 @@ defmodule BlockScoutWeb.API.RPC.Helpers do
     |> put_offset_option(params)
   end
 
+  def put_pagination_api_options(options, params) do
+    options
+    |> put_page_option(params)
+    |> put_limit_option(params)
+  end
+
   def put_page_option(options, %{"page" => page}) do
     case Integer.parse(page) do
       {page_number, ""} when page_number > 0 ->
@@ -33,6 +39,20 @@ defmodule BlockScoutWeb.API.RPC.Helpers do
   end
 
   def put_offset_option(options, _) do
+    options
+  end
+
+  def put_limit_option(options, %{"limit" => limit}) do
+    with {page_size, ""} when page_size > 0 <- Integer.parse(limit),
+         :ok <- validate_max_page_size(page_size) do
+      Map.put(options, :page_size, page_size)
+    else
+      _ ->
+        options
+    end
+  end
+
+  def put_limit_option(options, _) do
     options
   end
 
