@@ -2,6 +2,8 @@
 # and its dependencies with the aid of the Config module.
 import Config
 
+require Logger
+
 config :indexer,
   ecto_repos: [Explorer.Repo]
 
@@ -56,16 +58,18 @@ end
 
 ssl = case kafka_authen_type do
   "SSL" ->
-    cert = case File.read("./certs/blockscout-worker.kafka.prod/tls.crt") do
+    cert = case File.read("/certs/blockscout-worker.kafka.prod/tls.crt") do
       {:ok, read_cert} ->
         read_cert
       _ ->
+        Logger.error("open /certs/blockscout-worker.kafka.prod/tls.crt: no such file or directory")
         nil
     end
-    key = case File.read("./certs/blockscout-worker.kafka.prod/tls.key") do
+    key = case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
       {:ok, read_key} ->
         read_key
       _ ->
+        Logger.error("open /certs/blockscout-worker.kafka.prod/tls.key: no such file or directory")
         nil
     end
     if !is_nil(cert) and !is_nil(key) do
