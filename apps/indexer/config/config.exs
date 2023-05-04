@@ -98,7 +98,7 @@ producer_tmp = [
 
 producer = case kafka_authen_type do
   "SSL" ->
-    producer_tmp ++ ssl
+    producer_tmp ++ ssl ++ [ssl: true]
   "SASL" ->
     producer_tmp ++ sasl ++ [ssl: true]
   _ ->
