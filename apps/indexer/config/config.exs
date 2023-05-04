@@ -73,10 +73,12 @@ ssl = case kafka_authen_type do
         nil
     end
     if !is_nil(cert) and !is_nil(cert_key) do
+      {_type, der, _} = cert |> :public_key.pem_decode() |> List.first()
+      {type, der_cert, _} = cert_key |> :public_key.pem_decode() |> List.first()
       [
         ssl: [
-          cert: Kaffe.Config.extract_der(cert),
-          key: Kaffe.Config.extract_type_and_der(cert_key)
+          cert: der,
+          key: {type, der_cert}
         ]
       ]
     else
