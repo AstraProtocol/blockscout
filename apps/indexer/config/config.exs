@@ -65,18 +65,18 @@ ssl = case kafka_authen_type do
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.crt: no such file or directory")
         nil
     end
-    key = case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
+    cert_key = case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
       {:ok, read_key} ->
         read_key
       _ ->
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.key: no such file or directory")
         nil
     end
-    if !is_nil(cert) and !is_nil(key) do
+    if !is_nil(cert) and !is_nil(cert_key) do
       [
         ssl: [
-          cert: cert,
-          key: key
+          cert: Kaffe.Config.extract_der(cert),
+          key: Kaffe.Config.extract_type_and_der(cert_key)
         ]
       ]
     else
