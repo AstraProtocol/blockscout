@@ -58,38 +58,29 @@ end
 
 ssl = case kafka_authen_type do
   "SSL" ->
-    cert = case File.read("/certs/blockscout-worker.kafka.prod/tls.crt") do
+    System.put_env("KAFKA_URL", kafka_brokers)
+    case File.read("/certs/blockscout-worker.kafka.prod/tls.crt") do
       {:ok, read_cert} ->
-        Logger.info("cert: #{read_cert}")
+        System.put_env("KAFKA_CLIENT_CERT", read_cert)
         read_cert
       _ ->
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.crt: no such file or directory")
         nil
     end
-    cert_key = case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
+    case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
       {:ok, read_key} ->
-        Logger.info("key: #{read_key}")
+        System.put_env("KAFKA_CLIENT_CERT_KEY", read_key)
         read_key
       _ ->
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.key: no such file or directory")
         nil
     end
-    if !is_nil(cert) and !is_nil(cert_key) do
-      [
-        ssl: [
-          client_cert: cert,
-          client_cert_key: cert_key
-        ]
-      ]
-    else
-      []
-    end
+    [heroku_kafka_env: true]
   _ ->
     []
 end
 
 producer_tmp = [
-  endpoints: endpoints,
   topics: topics,
 
   # optional
@@ -100,7 +91,7 @@ producer = case kafka_authen_type do
   "SSL" ->
     producer_tmp ++ ssl
   "SASL" ->
-    producer_tmp ++ sasl ++ [ssl: true]
+    producer_tmp ++ sasl ++ [endpoints: endpoints] ++ [ssl: true]
   _ ->
     producer_tmp
 end
