@@ -60,7 +60,7 @@ ssl = case kafka_authen_type do
   "SSL" ->
     cert = case File.read("/certs/blockscout-worker.kafka.prod/tls.crt") do
       {:ok, read_cert} ->
-        Logger.info(read_cert)
+        Logger.info("cert: #{read_cert}")
         read_cert
       _ ->
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.crt: no such file or directory")
@@ -68,7 +68,7 @@ ssl = case kafka_authen_type do
     end
     cert_key = case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
       {:ok, read_key} ->
-        Logger.info(read_key)
+        Logger.info("key: #{read_key}")
         read_key
       _ ->
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.key: no such file or directory")
