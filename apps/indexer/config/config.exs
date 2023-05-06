@@ -75,12 +75,10 @@ ssl = case kafka_authen_type do
         nil
     end
     if !is_nil(cert) and !is_nil(cert_key) do
-      {_type, der, _} = cert |> :public_key.pem_decode() |> List.first()
-      {type, der_cert, _} = cert_key |> :public_key.pem_decode() |> List.first()
       [
         ssl: [
-          cert: der,
-          key: {type, der_cert}
+          client_cert: cert,
+          client_cert_key: cert_key
         ]
       ]
     else
@@ -100,7 +98,7 @@ producer_tmp = [
 
 producer = case kafka_authen_type do
   "SSL" ->
-    producer_tmp ++ ssl ++ [ssl: true]
+    producer_tmp ++ ssl
   "SASL" ->
     producer_tmp ++ sasl ++ [ssl: true]
   _ ->
