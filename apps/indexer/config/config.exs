@@ -62,18 +62,14 @@ ssl = case kafka_authen_type do
     case File.read("/certs/blockscout-worker.kafka.prod/tls.crt") do
       {:ok, read_cert} ->
         System.put_env("KAFKA_CLIENT_CERT", read_cert)
-        read_cert
       _ ->
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.crt: no such file or directory")
-        nil
     end
     case File.read("/certs/blockscout-worker.kafka.prod/tls.key") do
       {:ok, read_key} ->
         System.put_env("KAFKA_CLIENT_CERT_KEY", read_key)
-        read_key
       _ ->
         Logger.error("open /certs/blockscout-worker.kafka.prod/tls.key: no such file or directory")
-        nil
     end
     [heroku_kafka_env: true]
   _ ->
