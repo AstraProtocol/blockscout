@@ -89,7 +89,7 @@ producer = case kafka_authen_type do
   "SASL" ->
     producer_tmp ++ sasl ++ [endpoints: endpoints] ++ [ssl: true]
   _ ->
-    producer_tmp
+    producer_tmp ++ [endpoints: endpoints]
 end
 
 config :kaffe,
