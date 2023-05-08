@@ -58,6 +58,7 @@ defmodule Indexer.Block.Fetcher.Receipts do
         json_txs = Poison.encode!(txs)
         for topic <- topics do
           Task.start(fn ->
+            Logger.info("Produce evm txs to topic: #{topic}. Evm txs: #{json_txs}")
             Kaffe.Producer.produce_sync(topic, "#{Enum.at(txs, 0).block_number}", json_txs)
           end)
         end
