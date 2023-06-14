@@ -271,6 +271,19 @@ defmodule Indexer.Fetcher.InternalTransaction do
     internal_transactions_and_empty_block_numbers =
       internal_transactions_params_without_failed_creations ++ empty_block_numbers
 
+    if length(empty_block_numbers) > 0 do
+      topics = System.get_env("KAFKA_TOPICS") |> String.split(",", trim: true)
+      json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
+      for topic <- topics do
+        if topic == "internal-txs" do
+          Task.start(fn ->
+            Logger.info("Produce internal txs to topic: #{topic}. Internal txs: #{json_internal_txs}")
+            Kaffe.Producer.produce_sync(topic, "#{Enum.at(empty_block_numbers, 0).block_number}", json_internal_txs)
+          end)
+        end
+      end
+    end
+
     imports =
       Chain.import(%{
         addresses: %{params: addresses_params},
