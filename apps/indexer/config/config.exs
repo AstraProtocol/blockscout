@@ -25,7 +25,7 @@ config :logger, :indexer,
 kafka_topics = System.get_env("KAFKA_TOPICS")
 topics = case kafka_topics do
   nil ->
-    ["evm-txs"]
+    ["evm-txs", "internal-txs"]
   _ ->
     kafka_topics |> String.split(",", trim: true)
 end
