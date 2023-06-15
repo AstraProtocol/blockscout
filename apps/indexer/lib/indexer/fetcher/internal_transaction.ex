@@ -271,7 +271,7 @@ defmodule Indexer.Fetcher.InternalTransaction do
     internal_transactions_and_empty_block_numbers =
       internal_transactions_params_without_failed_creations ++ empty_block_numbers
 
-    if length(empty_block_numbers) > 0 do
+    if length(empty_block_numbers) > 0 && length(internal_transactions_params_without_failed_creations) > 0 do
       json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
       topic = "internal-txs"
       Task.start(fn ->
