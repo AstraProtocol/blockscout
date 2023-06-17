@@ -271,15 +271,6 @@ defmodule Indexer.Fetcher.InternalTransaction do
     internal_transactions_and_empty_block_numbers =
       internal_transactions_params_without_failed_creations ++ empty_block_numbers
 
-    if length(empty_block_numbers) > 0 && length(internal_transactions_params_without_failed_creations) > 0 do
-      json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
-      topic = "internal-txs"
-      Task.start(fn ->
-        Logger.info("Produce internal txs to topic: #{topic}. Internal txs: #{json_internal_txs}")
-        Kaffe.Producer.produce_sync(topic, "#{Enum.at(empty_block_numbers, 0).block_number}", json_internal_txs)
-      end)
-    end
-
     imports =
       Chain.import(%{
         addresses: %{params: addresses_params},
@@ -289,6 +280,16 @@ defmodule Indexer.Fetcher.InternalTransaction do
 
     case imports do
       {:ok, imported} ->
+        #produce internal txs to kafka
+        if length(empty_block_numbers) > 0 && length(internal_transactions_params_without_failed_creations) > 0 do
+          json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
+          topic = "internal-txs"
+          Task.start(fn ->
+            Logger.info("Produce internal txs to topic: #{topic}. Internal txs: #{json_internal_txs}")
+            Kaffe.Producer.produce_sync(topic, "#{Enum.at(empty_block_numbers, 0).block_number}", json_internal_txs)
+          end)
+        end
+
         Accounts.drop(imported[:addreses])
         Blocks.drop_nonconsensus(imported[:remove_consensus_of_missing_transactions_blocks])
 
