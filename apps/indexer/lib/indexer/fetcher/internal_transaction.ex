@@ -281,13 +281,12 @@ defmodule Indexer.Fetcher.InternalTransaction do
       {:ok, imported} ->
         #produce internal txs to kafka
         trace_first_block = EthereumJSONRPC.first_block_to_fetch(:trace_first_block)
-        if length(empty_block_numbers) > 0 &&
-             length(internal_transactions_params_without_failed_creations) > 0 &&
+        if length(internal_transactions_params_without_failed_creations) > 0 &&
              Enum.at(internal_transactions_params_without_failed_creations, 0).block_number >= trace_first_block do
           json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
           topic = "internal-txs"
           Task.start(fn ->
-            key = Enum.at(empty_block_numbers, 0).block_number
+            key = Enum.at(internal_transactions_params_without_failed_creations, 0).block_number
             Logger.info("Produce internal txs to topic: #{topic}. Key: #{key} Internal txs: #{json_internal_txs}")
             Kaffe.Producer.produce_sync(topic, "#{key}", json_internal_txs)
           end)
