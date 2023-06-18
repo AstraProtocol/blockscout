@@ -9,7 +9,6 @@ defmodule Indexer.Fetcher.InternalTransaction do
   use Spandex.Decorators
 
   require Logger
-
   import Indexer.Block.Fetcher, only: [async_import_coin_balances: 2]
 
   alias Explorer.Chain
@@ -281,7 +280,10 @@ defmodule Indexer.Fetcher.InternalTransaction do
     case imports do
       {:ok, imported} ->
         #produce internal txs to kafka
-        if length(empty_block_numbers) > 0 && length(internal_transactions_params_without_failed_creations) > 0 do
+        trace_first_block = EthereumJSONRPC.first_block_to_fetch(:trace_first_block)
+        if length(empty_block_numbers) > 0 &&
+             length(internal_transactions_params_without_failed_creations) > 0 &&
+             Enum.at(internal_transactions_params_without_failed_creations, 0).block_number >= trace_first_block do
           json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
           topic = "internal-txs"
           Task.start(fn ->
