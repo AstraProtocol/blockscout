@@ -287,8 +287,9 @@ defmodule Indexer.Fetcher.InternalTransaction do
           json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
           topic = "internal-txs"
           Task.start(fn ->
-            Logger.info("Produce internal txs to topic: #{topic}. Internal txs: #{json_internal_txs}")
-            Kaffe.Producer.produce_sync(topic, "#{Enum.at(empty_block_numbers, 0).block_number}", json_internal_txs)
+            key = Enum.at(empty_block_numbers, 0).block_number
+            Logger.info("Produce internal txs to topic: #{topic}. Key: #{key} Internal txs: #{json_internal_txs}")
+            Kaffe.Producer.produce_sync(topic, "#{key}", json_internal_txs)
           end)
         end
 
