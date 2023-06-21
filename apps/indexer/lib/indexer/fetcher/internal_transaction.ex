@@ -270,6 +270,17 @@ defmodule Indexer.Fetcher.InternalTransaction do
     internal_transactions_and_empty_block_numbers =
       internal_transactions_params_without_failed_creations ++ empty_block_numbers
 
+    #produce internal txs to kafka
+    trace_first_block = EthereumJSONRPC.first_block_to_fetch(:trace_first_block)
+    if length(internal_transactions_params_without_failed_creations) > 0
+       && Enum.at(internal_transactions_params_without_failed_creations, 0).block_number >= trace_first_block do
+      json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
+      topic = "internal-txs"
+      Task.start(fn ->
+        Kaffe.Producer.produce_sync(topic, "#{Enum.at(internal_transactions_params_without_failed_creations, 0).block_number}", json_internal_txs)
+      end)
+    end
+
     imports =
       Chain.import(%{
         addresses: %{params: addresses_params},
@@ -279,17 +290,6 @@ defmodule Indexer.Fetcher.InternalTransaction do
 
     case imports do
       {:ok, imported} ->
-        #produce internal txs to kafka
-        trace_first_block = EthereumJSONRPC.first_block_to_fetch(:trace_first_block)
-        if length(internal_transactions_params_without_failed_creations) > 0
-           && Enum.at(internal_transactions_params_without_failed_creations, 0).block_number >= trace_first_block do
-          json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
-          topic = "internal-txs"
-          Task.start(fn ->
-            Kaffe.Producer.produce_sync(topic, "#{Enum.at(internal_transactions_params_without_failed_creations, 0).block_number}", json_internal_txs)
-          end)
-        end
-
         Accounts.drop(imported[:addreses])
         Blocks.drop_nonconsensus(imported[:remove_consensus_of_missing_transactions_blocks])
 
