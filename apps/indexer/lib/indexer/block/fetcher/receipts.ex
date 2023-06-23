@@ -52,17 +52,17 @@ defmodule Indexer.Block.Fetcher.Receipts do
       end
     end)
 
-    case txs do
-      [_|_] ->
-        json_txs = Poison.encode!(txs)
-        topic = "evm-txs"
-        Task.start(fn ->
-          Kaffe.Producer.produce_sync(topic, "#{Enum.at(txs, 0).block_number}", json_txs)
-        end)
-        txs
-      _ ->
-        txs
+    #produce evm txs to kafka
+    trace_first_block = EthereumJSONRPC.first_block_to_fetch(:trace_first_block)
+    if length(txs) > 0 && Enum.at(txs, 0).block_number >= trace_first_block do
+      json_txs = Poison.encode!(txs)
+      topic = "evm-txs"
+      Task.start(fn ->
+        Kaffe.Producer.produce_sync(topic, "#{Enum.at(txs, 0).block_number}", json_txs)
+      end)
     end
+
+    txs
   end
 
   defp set_block_number_to_logs(%{logs: logs} = params, transaction_params) do
