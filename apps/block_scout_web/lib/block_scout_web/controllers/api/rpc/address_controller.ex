@@ -384,7 +384,7 @@ defmodule BlockScoutWeb.API.RPC.AddressController do
           }
         ] |> Keyword.merge(paging_options_list_internal_transactions(params, options))
 
-      internal_transactions_plus_one = Chain.all_transaction_to_internal_transactions(transaction_hash, full_options)
+      internal_transactions_plus_one = Chain.transaction_to_internal_transactions(transaction_hash, full_options)
       {internal_transactions, next_page} =
         split_list_by_page(internal_transactions_plus_one, options_with_defaults.page_size)
 
