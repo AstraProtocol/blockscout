@@ -71,36 +71,10 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
 
   defp prepare_transaction(transaction) do
     %{
-      "blockHeight" => transaction.block_number,
-      "blockHash" => "#{transaction.block.hash}",
-      "blockTime" => transaction.block.timestamp,
       "hash" => "#{transaction.hash}",
-      "cosmosHash" => "#{transaction.cosmos_hash}",
       "success" => if(transaction.status == :ok, do: true, else: false),
       "error" => "#{transaction.error}",
-      "from" => "#{transaction.from_address_hash}",
-      "fromAddressName" => Chain.get_address_name(transaction.from_address),
-      "to" => "#{transaction.to_address_hash}",
-      "toAddressName" => Chain.get_address_name(transaction.to_address),
-      "value" => transaction.value.value,
-      "input" => "#{transaction.input}",
-      "gasLimit" => transaction.gas,
-      "gasUsed" => transaction.gas_used,
-      "gasPrice" => transaction.gas_price.value,
-      "cumulativeGasUsed" => transaction.cumulative_gas_used,
-      "index" => transaction.index,
-      "createdContractAddressHash" => to_string(transaction.created_contract_address_hash),
-      "createdContractAddressName" => Chain.get_address_name(transaction.created_contract_address),
-      "createdContractCodeIndexedAt" => transaction.created_contract_code_indexed_at,
-      "nonce" => transaction.nonce,
-      "r" => transaction.r,
-      "s" => transaction.s,
-      "v" => transaction.v,
-      "maxPriorityFeePerGas" => parse_gas_value(transaction.max_priority_fee_per_gas),
-      "maxFeePerGas" => parse_gas_value(transaction.max_fee_per_gas),
-      "type" => transaction.type,
       "tokenTransfers" => Enum.map(transaction.token_transfers, &prepare_token_transfer/1),
-      "revertReason" => "#{prepare_revert_reason(transaction)}"
     }
   end
 

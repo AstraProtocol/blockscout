@@ -244,13 +244,7 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
   def gettxswithtokentransfersbytxhashes(conn, params) do
     with {:txhash_param, {:ok, txhash_param}} <- fetch_txhash(params),
          {:format, {:ok, tx_hashes}} <- to_tx_hashes(txhash_param) do
-      tx_list = Chain.hashes_to_transactions(tx_hashes,
-        necessity_by_association: %{
-        :block => :optional,
-        [created_contract_address: :names] => :optional,
-        [from_address: :names] => :optional,
-        [to_address: :names] => :optional
-      })
+      tx_list = Chain.hashes_to_transactions(tx_hashes)
       render(conn, "txlist.json", %{transactions: tx_list})
     else
       {:txhash_param, :error} ->
