@@ -247,9 +247,10 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
       tx_list = Chain.hashes_to_transactions(tx_hashes,
         necessity_by_association: %{
         :block => :optional,
-        [created_contract_address: :names] => :optional,
-        [from_address: :names] => :optional,
-        [to_address: :names] => :optional
+        [token_transfers: :token] => :optional,
+        [token_transfers: :to_address] => :optional,
+        [token_transfers: :from_address] => :optional,
+        [token_transfers: :token_contract_address] => :optional,
       })
       render(conn, "txlist.json", %{transactions: tx_list})
     else
