@@ -14,6 +14,11 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
     RPCView.render("show.json", data: data)
   end
 
+  def render("txlist.json", %{transactions: transactions}) do
+    data = Enum.map(transactions, &prepare_transaction/1)
+    RPCView.render("show.json", data: data)
+  end
+
   def render("getabibytxhash.json", %{abi: abi, verified: verified}) do
     RPCView.render("show.json", data: %{"abi" => abi, "verified" => verified})
   end
@@ -61,6 +66,41 @@ defmodule BlockScoutWeb.API.RPC.TransactionView do
     %{
       "isError" => "1",
       "errDescription" => error |> Atom.to_string() |> String.replace("_", " ")
+    }
+  end
+
+  defp prepare_transaction(transaction) do
+    %{
+      "blockHeight" => transaction.block_number,
+      "blockHash" => "#{transaction.block.hash}",
+      "blockTime" => transaction.block.timestamp,
+      "hash" => "#{transaction.hash}",
+      "cosmosHash" => "#{transaction.cosmos_hash}",
+      "success" => if(transaction.status == :ok, do: true, else: false),
+      "error" => "#{transaction.error}",
+      "from" => "#{transaction.from_address_hash}",
+      "fromAddressName" => Chain.get_address_name(transaction.from_address),
+      "to" => "#{transaction.to_address_hash}",
+      "toAddressName" => Chain.get_address_name(transaction.to_address),
+      "value" => transaction.value.value,
+      "input" => "#{transaction.input}",
+      "gasLimit" => transaction.gas,
+      "gasUsed" => transaction.gas_used,
+      "gasPrice" => transaction.gas_price.value,
+      "cumulativeGasUsed" => transaction.cumulative_gas_used,
+      "index" => transaction.index,
+      "createdContractAddressHash" => to_string(transaction.created_contract_address_hash),
+      "createdContractAddressName" => Chain.get_address_name(transaction.created_contract_address),
+      "createdContractCodeIndexedAt" => transaction.created_contract_code_indexed_at,
+      "nonce" => transaction.nonce,
+      "r" => transaction.r,
+      "s" => transaction.s,
+      "v" => transaction.v,
+      "maxPriorityFeePerGas" => parse_gas_value(transaction.max_priority_fee_per_gas),
+      "maxFeePerGas" => parse_gas_value(transaction.max_fee_per_gas),
+      "type" => transaction.type,
+      "tokenTransfers" => Enum.map(transaction.token_transfers, &prepare_token_transfer/1),
+      "revertReason" => "#{prepare_revert_reason(transaction)}"
     }
   end
 

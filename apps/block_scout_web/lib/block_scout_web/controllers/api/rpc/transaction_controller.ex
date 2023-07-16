@@ -241,6 +241,60 @@ defmodule BlockScoutWeb.API.RPC.TransactionController do
     end
   end
 
+  def gettxswithtokentransfersbytxhashes(conn, params) do
+    with {:txhash_param, {:ok, txhash_param}} <- fetch_txhash(params),
+         {:format, {:ok, tx_hashes}} <- to_tx_hashes(txhash_param) do
+      tx_list = Chain.hashes_to_transactions(tx_hashes,
+        necessity_by_association: %{
+        :block => :optional,
+        [created_contract_address: :names] => :optional,
+        [from_address: :names] => :optional,
+        [to_address: :names] => :optional
+      })
+      render(conn, "txlist.json", %{transactions: tx_list})
+    else
+      {:txhash_param, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Query parameter txhash is required")
+
+      {:format, :error} ->
+        conn
+        |> put_status(200)
+        |> render(:error, error: "Invalid txhash format")
+    end
+  end
+
+  defp to_tx_hashes(txhash_param) when is_binary(txhash_param) do
+    txhash_param
+    |> String.split(",")
+    |> Enum.take(20)
+    |> to_tx_hashes()
+  end
+
+  defp to_tx_hashes(txhash_param) when is_list(txhash_param) do
+    tx_hashes = tx_param_to_tx_hashes(txhash_param)
+
+    if any_errors?(tx_hashes) do
+      {:format, :error}
+    else
+      {:format, {:ok, tx_hashes}}
+    end
+  end
+
+  defp tx_param_to_tx_hashes(txhash_param) do
+    Enum.map(txhash_param, fn single_txhash ->
+      case Chain.string_to_transaction_hash(single_txhash) do
+        {:ok, tx_hash} -> tx_hash
+        :error -> :error
+      end
+    end)
+  end
+
+  defp any_errors?(tx_hashes) do
+    Enum.any?(tx_hashes, &(&1 == :error))
+  end
+
   defp fetch_txhash(params) do
     {:txhash_param, Map.fetch(params, "txhash")}
   end
