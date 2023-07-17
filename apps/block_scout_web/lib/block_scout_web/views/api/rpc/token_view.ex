@@ -119,7 +119,13 @@ defmodule BlockScoutWeb.API.RPC.TokenView do
       "transactionHash" => "#{token_transfer.transaction.hash}",
       "blockHash" => "#{token_transfer.transaction.block.hash}",
       "timestamp" => to_string(DateTime.to_unix(token_transfer.transaction.block.timestamp)),
-      "amount" => "#{token_transfer.amount}",
+      "amount" => "#{
+        if token_transfer.token.type == "ERC-721" && "#{token_transfer.amount}" == "" do
+          1
+        else
+          token_transfer.amount
+        end
+      }",
       "fromAddress" => "#{token_transfer.from_address}",
       "fromAddressName" => Chain.get_address_name(token_transfer.from_address),
       "toAddress" => "#{token_transfer.to_address}",
