@@ -354,7 +354,13 @@ defmodule BlockScoutWeb.API.RPC.AddressView do
 
   defp prepare_token_transfer_for_api(token_transfer) do
     %{
-      "amount" => "#{token_transfer.amount}",
+      "amount" => "#{
+        if token_transfer.token.type == "ERC-721" && "#{token_transfer.amount}" == "" do
+          1
+        else
+          token_transfer.amount
+        end
+      }",
       "logIndex" => "#{token_transfer.log_index}",
       "fromAddress" => "#{token_transfer.from_address}",
       "fromAddressName" => Chain.get_address_name(token_transfer.from_address),
