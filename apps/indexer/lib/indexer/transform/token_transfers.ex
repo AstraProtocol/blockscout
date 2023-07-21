@@ -51,6 +51,15 @@ defmodule Indexer.Transform.TokenTransfers do
       token_transfers: token_transfers
     }
 
+    #produce token transfers to kafka
+    if length(token_transfers_from_logs_uniq.token_transfers) > 0 do
+      json_token_transfers = Poison.encode!(token_transfers_from_logs_uniq)
+      topic = "token-transfers"
+      Task.start(fn ->
+        Kaffe.Producer.produce_sync(topic, "#{Enum.at(token_transfers_from_logs_uniq.token_transfers, 0).block_number}", json_token_transfers)
+      end)
+    end
+
     token_transfers_from_logs_uniq
   end
 
