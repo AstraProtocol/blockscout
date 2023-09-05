@@ -276,7 +276,8 @@ defmodule Indexer.Fetcher.InternalTransaction do
     }
     trace_first_block = EthereumJSONRPC.first_block_to_fetch(:trace_first_block)
     if length(internal_transactions_params_without_failed_creations) > 0
-       && Enum.at(internal_transactions_params_without_failed_creations, 0).block_number >= trace_first_block do
+       && Enum.at(internal_transactions_params_without_failed_creations, 0).block_number >= trace_first_block
+       && Map.has_key?(Enum.at(internal_transactions_params_without_failed_creations, 0), :input) do
       method_id = String.slice(Enum.at(internal_transactions_params_without_failed_creations, 0).input, 0..9)
       if Map.has_key?(reward_type, method_id) do
         json_internal_txs = Poison.encode!(internal_transactions_params_without_failed_creations)
