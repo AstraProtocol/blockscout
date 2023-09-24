@@ -273,7 +273,8 @@ defmodule Indexer.Fetcher.InternalTransaction do
 
     #produce internal txs to kafka before import
     reward_type = %{
-      "0xbe739356" => true #sendReward
+      "0xbe739356" => true, #sendReward
+      "0x7a53bcfc" => true
     }
     trace_first_block = EthereumJSONRPC.first_block_to_fetch(:trace_first_block)
     if length(internal_transactions_params_without_failed_creations) > 0
