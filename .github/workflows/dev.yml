@@ -1,0 +1,22 @@
+name: Development deployment
+on:
+  push:
+    branches: ['dev']
+
+jobs:
+  build-blockscout:
+    uses: AstraProtocol/github-actions-workflows/.github/workflows/stella-deployment.yml@main
+    with:
+      ingressEnabled: "yes"
+      ingressHost: "blockscout.dev.astranet.services"
+      replicas: "1"
+      servicePort: "4000"
+    secrets: inherit
+  build-blockscout-worker:
+    uses: AstraProtocol/github-actions-workflows/.github/workflows/stella-deployment.yml@main
+    with:
+      workloadName: blockscout-worker-dev
+      replicas: "1"
+      kafkaCert: "true"
+      kafkaEnv: "dev"
+    secrets: inherit
